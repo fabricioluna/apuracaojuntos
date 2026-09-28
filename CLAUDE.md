@@ -82,7 +82,8 @@ Módulo isolado, sem dependência de interface, que roda no navegador e no servi
 Pesqueira (PE), 55ª Zona Eleitoral. `data/cidade/pesqueira.json` é gerado por `scripts/importar-secoes.mjs` a partir de `docs/locais.csv` (portal de dados abertos do TSE): 33 locais, 181 seções, 52.577 eleitores aptos.
 
 - **As seções não são numeradas de 1 a N.** Vão de 26 a 259, com buracos (a zona 55 atende mais de um município). A configuração guarda a **lista explícita de seções** de cada zona, com os aptos de cada uma. O protótipo assumia "quantidade de seções", o que não vale aqui.
-- Pendente: código do município no TSE (campo `MUNI` do BU) para validar que o BU é de Pesqueira.
+- Código do município no TSE (campo `MUNI` do BU): **25178, informado pela responsável pelo projeto, não confirmado por fonte independente**. Fica na configuração pública (editável). Conferir com o primeiro BU real; se o `MUNI` for outro, corrigir na configuração.
+- Firebase: projeto `apuracaojuntos`, app web criado, plano Spark (Storage exige Blaze). Autenticação, Firestore e Storage ainda não ativados.
 - Um BU pode cobrir seções agregadas (`AGRE`). A urna identificada é a do campo `SECA`.
 
 ## Decisões aprovadas
