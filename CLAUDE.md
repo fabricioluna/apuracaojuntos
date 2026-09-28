@@ -60,6 +60,23 @@ Assinatura (verificado): as 6 assinaturas Ed25519 dos exemplos de 2018 são vál
 
 Os `.imgbu` trazem o texto do relatório legível, mas o QR Code está num formato binário da impressora que não foi decifrado. O caminho que funciona: extrair as imagens dos PDFs com `pdfimages -png` (Poppler) e decodificar com `jsQR`. Os 13 QR Codes dos 6 exemplos foram lidos assim.
 
+## Decodificador (src/bu)
+
+Módulo isolado, sem dependência de interface, que roda no navegador e no servidor (só usa `@noble/hashes` e `@noble/curves`).
+
+- `decodificarBU(textos, { chaves? })`: recebe o texto de todos os QR Codes (qualquer ordem, repetições iguais são descartadas), valida sequência, cadeia de hashes e somas, e devolve `{ ok: true, boletim } | { ok: false, erros }`. Cada erro tem `codigo` e uma `mensagem` em português dizendo o que corrigir.
+- `lerParte(texto)`: classifica um QR Code (dados, certificado ou erro), para a câmera dar retorno a cada leitura.
+- Cargos: `votos` (por número do candidato), `legenda` (por número do partido), `branco`, `nulo`, `total` (TOTC), `nominais`, `legendaTotal`, `aptos`. O nome do candidato NÃO vem do QR Code (regra do app: mostrar "Candidato NNNN" quando não houver na lista).
+- Recusas do decodificador: QR Code faltando, de outra urna (número repetido com conteúdo diferente, ou cadeia de hashes que não fecha), versão desconhecida, formatos misturados, assinatura ausente ou inválida (1.5), somas que não batem, certificado de outra urna.
+- Regras de política (fase oficial, UF, município, zona e seção existentes, cinco cargos presentes) ficam na camada de domínio (etapa 3), não no decodificador.
+- **Não confirmado por exemplo real:** o texto dos QR Codes de certificado (`QRCE`). O parser segue a tabela do manual 2026 (`QRCE:n:x IDUE MDUE CERT`) e é tolerante; os testes usam textos sintéticos. Quando houver um BU real de 2026, conferir.
+
+## Comandos
+
+- `npm test`: Vitest. `npm run typecheck`: TypeScript. `npm run extrair-qr`: regera `tests/fixtures/bu-2018.json` a partir dos PDFs de exemplo (precisa do Poppler).
+- Um teste extra compara o que o decodificador leu com o relatório impresso (`.imgbu`); ele só roda se `docs/tse-exemplos-boletim-urna-eleicoes-2018/` existir.
+- `docs/*.pdf` e os exemplos do TSE não estão no repositório (o manual de 2018 proíbe reprodução sem autorização).
+
 ## Dados da cidade
 
 Pesqueira (PE), 55ª Zona Eleitoral. `data/cidade/pesqueira.json` é gerado por `scripts/importar-secoes.mjs` a partir de `docs/locais.csv` (portal de dados abertos do TSE): 33 locais, 181 seções, 52.577 eleitores aptos.

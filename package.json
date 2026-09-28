@@ -1,0 +1,23 @@
+{
+  "name": "construindo-juntos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Totalização paralela e não oficial de votos (Construindo Juntos)",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "extrair-qr": "node scripts/extrair-qr-exemplos.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
