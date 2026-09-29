@@ -164,6 +164,15 @@ O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes s
 - **Bug real encontrado pelo teste manual:** `.fill` (a barra preenchida do gráfico) é um `<span>`, que por padrão é `display: inline` — CSS ignora `width`/`height` em elementos inline não substituídos, então a barra não aparecia preenchida (só o trilho de fundo). Faltava `display: block` em `.fill`. Corrigido em `app/globals.css`; conferido pixel a pixel via `getComputedStyle` antes e depois da correção.
 - **Confirmado com Playwright contra `next dev` + os três emuladores:** três urnas digitadas com candidatos e votos diferentes, painel público mostra os totais corretos e ao vivo, abas trocam de cargo, toque na barra mostra "lidera em N de M urnas" e "melhor resultado" com zona/seção corretos, grade de urnas colorida, aviso de não-oficial sempre visível.
 
+## Preparação para a Vercel
+
+Feito no projeto Firebase **real** (`apuracaojuntos`), não no emulador:
+- Confirmado por leitura direta (Admin SDK, antes de mexer): Firestore e Authentication já estavam ativos e alcançáveis, mas vazios. Storage **não existe ainda** (confirmado: o bucket não existe — falta o plano Blaze, ver pendências abaixo).
+- `firestore.rules` publicada (`firebase deploy --only firestore:rules --project apuracaojuntos`) e conferida com requisições HTTP reais e sem login: leitura pública (`config/publico`) responde 404 (não existe, mas a regra deixa ler); leitura privada (`boletins/*`) responde 403 (negada). `storage.rules` **ainda não foi publicada** — só é possível depois que o bucket existir.
+- `config/publico` gravado com os dados de Pesqueira (181 seções, zona 55, turno 1). O código do município (25178) segue como no CLAUDE.md: informado pela responsável pelo projeto, não confirmado por fonte independente — editável depois pelo painel do administrador (etapa 6) se precisar corrigir.
+- Conta de administrador criada em `fiscais` (nome "Fabrício Luna (administrador)", claim `admin`). O código foi mostrado uma vez, só nesta conversa — guarde num gerenciador de senhas.
+- `package.json` ganhou os scripts padrão do Next.js (`dev`, `build`, `start`), que faltavam (eu vinha chamando `next dev`/`next build` direto). `vercel.json` define a região `gru1` (São Paulo), mais perto do Firestore (`southamerica-east1`) e dos eleitores.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
