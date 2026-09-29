@@ -30,7 +30,12 @@ const config = {
   municipio: CODIGO_MUNICIPIO,
   nomeMunicipio: cidade.municipio,
   turno: TURNO,
-  zonas: cidade.zonas.map(z => ({ zona: z.zona, secoes: z.secoes.map(s => ({ secao: s.secao, aptos: s.aptos })) })),
+  // nomeLocal identifica o local de votação (escola, colégio...), para o painel público mostrar
+  // quais localidades ainda faltam, não só números de zona/seção.
+  zonas: cidade.zonas.map(z => ({
+    zona: z.zona,
+    secoes: z.secoes.map(s => ({ secao: s.secao, aptos: s.aptos, ...(s.nomeLocal ? { nomeLocal: s.nomeLocal } : {}) })),
+  })),
   cargosPorTurno: {
     1: ['presidente', 'governador', 'senador', 'federal', 'estadual'],
     2: ['presidente'], // ajuste depois se o 2º turno também tiver governador

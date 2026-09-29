@@ -4,6 +4,9 @@ import type { BoletimDecodificado, CargoApurado, CargoId } from '../bu/types';
 export interface SecaoConfig {
   secao: number;
   aptos: number;
+  /** Nome do local de votação (escola, colégio...), quando disponível. Usado no painel público
+   * para mostrar quais localidades ainda faltam, não só números de zona/seção. */
+  nomeLocal?: string;
 }
 
 export interface ZonaConfig {

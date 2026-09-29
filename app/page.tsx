@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO } from '../src/bu/cargos';
 import type { CargoId } from '../src/bu/types';
 import { nomeCandidato, nomePartido, type ListaCandidatos } from '../src/domain/candidatos';
+import { locaisFaltando, locaisPorSituacao } from '../src/domain/locais';
 import { usarConfigCidade } from '../src/client/config';
 import { usarMapa, usarTotaisCargo, type TotaisCargo } from '../src/client/totais';
 import { IconeInfo } from '../src/ui/icones';
@@ -37,6 +38,9 @@ export default function PaginaApuracao() {
   const [linhaAberta, setLinhaAberta] = useState<string | null>(null);
 
   const M = useMemo(() => config?.zonas.reduce((a, z) => a + z.secoes.length, 0) ?? 0, [config]);
+  // Um boletim (mesmo com divergência em análise) já chegou dessa seção; só "ainda não enviada" falta.
+  const secoesComBoletim = useMemo(() => new Set(mapa ? Object.keys(mapa.secoes) : []), [mapa]);
+  const faltam = useMemo(() => (config ? locaisFaltando(locaisPorSituacao(config, secoesComBoletim)) : []), [config, secoesComBoletim]);
 
   if (!config) return null;
 
@@ -67,7 +71,8 @@ export default function PaginaApuracao() {
     z.secoes.map(s => {
       const chave = `${z.zona}-${s.secao}`;
       const status = mapa?.secoes[chave];
-      const rotulo = `Zona ${z.zona}, seção ${s.secao}: ${status === 'div' ? 'apurada, com divergência em análise' : status === 'ok' ? 'apurada' : 'ainda não enviada'}`;
+      const local = s.nomeLocal ? `${s.nomeLocal} — ` : '';
+      const rotulo = `${local}Zona ${z.zona}, seção ${s.secao}: ${status === 'div' ? 'apurada, com divergência em análise' : status === 'ok' ? 'apurada' : 'ainda não enviada'}`;
       return <span key={chave} className={`urna ${status ?? ''}`} title={rotulo} />;
     }),
   );
@@ -130,6 +135,19 @@ export default function PaginaApuracao() {
                 Ainda não enviada
               </li>
             </ul>
+            {faltam.length > 0 && (
+              <details>
+                <summary style={{ cursor: 'pointer', fontWeight: 650 }}>Locais que ainda faltam ({faltam.length})</summary>
+                <div className="fichas">
+                  {faltam.map(l => (
+                    <span className="ficha" key={l.nome}>
+                      {l.nome}
+                      {l.total > 1 ? ` (${l.apuradas}/${l.total})` : ''}
+                    </span>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
 
           {!totais || todas.length === 0 ? (

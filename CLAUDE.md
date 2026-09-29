@@ -172,6 +172,17 @@ Feito no projeto Firebase **real** (`apuracaojuntos`), não no emulador:
 - `config/publico` gravado com os dados de Pesqueira (181 seções, zona 55, turno 1). O código do município (25178) segue como no CLAUDE.md: informado pela responsável pelo projeto, não confirmado por fonte independente — editável depois pelo painel do administrador (etapa 6) se precisar corrigir.
 - Conta de administrador criada em `fiscais` (nome "Fabrício Luna (administrador)", claim `admin`). O código foi mostrado uma vez, só nesta conversa — guarde num gerenciador de senhas.
 - `package.json` ganhou os scripts padrão do Next.js (`dev`, `build`, `start`), que faltavam (eu vinha chamando `next dev`/`next build` direto). `vercel.json` define a região `gru1` (São Paulo), mais perto do Firestore (`southamerica-east1`) e dos eleitores.
+- Código enviado ao GitHub (`fabricioluna/apuracaojuntos`, branch `main`). **O repositório está público** — decisão da responsável pelo projeto, não minha; conferi antes que nenhuma chave ou credencial está versionada.
+
+## Locais de votação no painel público
+
+A pedido da responsável pelo projeto: além da grade abstrata de zona/seção, o painel público mostra **quais locais** (escola, colégio...) ainda faltam, agrupando as seções que pertencem ao mesmo local físico (um local pode ter várias seções — ex.: "Escola Arco Iris" tem as seções 26, 27, 28 e 213 em Pesqueira).
+
+- `SecaoConfig.nomeLocal` (opcional): vem do CSV do TSE (`docs/locais.csv` → `scripts/importar-secoes.mjs` → `data/cidade/pesqueira.json`) e agora é preservado por `scripts/definir-config.mjs` ao gravar `config/publico` (antes ele descartava o campo). **Repeti a gravação em produção** para incluir os nomes que já estavam faltando lá.
+- `src/domain/locais.ts` (puro, testado): agrupa por `nomeLocal`, conta apuradas/total. Seção sem nome cadastrado vira "Zona Z, seção S", para não sumir da lista.
+- Conta como "tem boletim" tanto `ok` quanto `div` no mapa — a divergência em análise significa que o boletim chegou, só não foi validado ainda.
+- `app/page.tsx`: lista colapsável "Locais que ainda faltam (N)", abaixo da grade, com badges tipo `Nome (apuradas/total)`. Independe do cargo selecionado (a lista de urnas com boletim é a mesma para os cinco).
+- **Bug real encontrado pelo teste manual:** usei as classes `.fichas`/`.ficha` (badges) sem elas existirem no CSS — na etapa 4 eu tinha deliberadamente deixado de fora os estilos específicos da Administração do protótipo, e essas classes faziam parte desse bloco pulado. Adicionadas em `app/globals.css`. Confirmado visualmente com os 181 locais reais de Pesqueira.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

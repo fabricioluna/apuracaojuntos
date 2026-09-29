@@ -622,6 +622,19 @@ main {
   height: 20px;
   accent-color: var(--accent);
 }
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ficha {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ---------- Novo boletim ---------- */
 .passos {
