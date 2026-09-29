@@ -19,3 +19,4 @@ docs/tse-lista-hashes-chave-publica-eleicoes-2018/
 docs/locais.csv
 ui-debug.log
 database-debug.log
+storage-debug.log

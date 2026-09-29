@@ -102,7 +102,9 @@ Adotadas por padrão (propostas do plano, ainda revisáveis):
 
 Decididas na etapa 3, substituindo propostas anteriores:
 - **Login: código numérico único por pessoa, sem e-mail nem senha** (não Google). O administrador (fabricioluna@gmail.com) usa o mesmo mecanismo; o que muda é a claim `admin`. Fluxo: `POST /api/auth/entrar {codigo}` confere o hash do código em `fiscais`, devolve um **custom token** do Firebase Auth; o cliente troca por um ID token com `signInWithCustomToken`. `exigirFiscal`/`exigirAdmin` sempre conferem `ativo`/`admin` **ao vivo no Firestore** a cada requisição, não confiam só na claim do token (que pode ficar até 1h desatualizada).
-- **Sem foto do BU no Storage** (decisão explícita, revertendo o pedido original de "prova de auditoria"): mais simples, sem plano Blaze. Consequência: nada para comparar visualmente numa divergência; a tela de divergências (etapa 6) mostra só os números. `Storage` não é criado.
+- **Foto do BU: só quando o QR Code falha.** Revisto de novo: a foto volta, mas não para todo envio. Ordem de tentativa na tela de Novo boletim: (1) câmera ao vivo; (2) se uma parte não ler, foto do boletim, que também tenta decodificar um QR Code da imagem; (3) só se isso falhar, o fiscal digita a urna inteira. A foto (quando tirada) fica anexada como prova, mesmo que tenha conseguido decodificar um QR Code dela. Isso exige o Storage (plano Blaze) **em produção**; em desenvolvimento uso o emulador do Storage, sem custo. Ativar o Storage de verdade fica para perto da publicação (etapa 4/5), não bloqueia o trabalho agora.
+- **Digitação é da urna inteira, nunca de um cargo isolado.** Cada QR Code é um pedaço de um texto único que descreve toda a urna (cortado só pelo tamanho, sem relação com os cargos); se uma parte falha, não dá para isolar qual cargo foi afetado. Por isso a rota `/api/boletins` só aceita OU todos os QR Codes OU os cinco cargos digitados, nunca uma mistura (já implementado na etapa 3).
+- **Digitação não tem lista fixa de candidatos.** O BU real só lista quem recebeu voto, e não sabemos de antemão quem vai concorrer. A tela de digitar deixa o fiscal adicionar linhas "número do candidato + votos" livremente, para cada cargo (e "número do partido + votos de legenda" nos proporcionais), em vez de uma lista fechada como no protótipo.
 - Limite de tentativas de login: 8 tentativas erradas por identificador (IP) a cada 15 minutos.
 
 ## Descoberta sobre o BU real: não existe QR Code por cargo
@@ -129,12 +131,28 @@ O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes s
 
 ## Testes de servidor (emulador)
 
-- Rodar antes: `npx firebase-tools emulators:start --only firestore,auth --project apuracaojuntos` (Java já está instalado). `tests/setup-emulador.ts` aponta os testes para `127.0.0.1:8080`/`9099`.
+- Rodar antes: `npx firebase-tools emulators:start --only firestore,auth,storage --project apuracaojuntos` (Java já está instalado). `tests/setup-emulador.ts` aponta os testes para `127.0.0.1:8080`/`9099`/`9199`.
 - **Importante:** o projeto de teste usa o **mesmo id do projeto real** (`apuracaojuntos`) de propósito. O emulador de Auth foi iniciado com `--project apuracaojuntos` e fixa esse projeto nas trocas de `signInWithCustomToken`; um id diferente (`apuracaojuntos-teste`, por exemplo) causa erro de "aud incorreto" no `verifyIdToken`. Isso é seguro: com as variáveis de emulador definidas, nada sai do computador.
 - `tests/helpers/emulador.ts`: `limparEmulador()` (apaga Firestore e Auth do projeto de teste), `seedFiscal`, `loginComoFiscal` (login real de ponta a ponta: código → custom token → troca no Auth emulator → ID token).
-- `tests/rules/firestore.test.ts`: `@firebase/rules-unit-testing` contra as `firestore.rules` reais.
+- `tests/rules/firestore.test.ts` e `tests/rules/storage.test.ts`: `@firebase/rules-unit-testing` contra as `firestore.rules`/`storage.rules` reais.
 - Os arquivos de teste rodam em série (`fileParallelism: false`): o emulador é uma instância única e paralelizar causa timeouts por contenção, não bugs.
 - **Confirmado com um teste manual de ponta a ponta** (`next dev` apontado para o emulador, chamadas HTTP reais): login por código, envio de boletim (novo → igual) funcionam através do servidor de verdade, não só das funções chamadas direto.
+
+## Etapa 4: tela de Novo boletim
+
+- Visual migrado do protótipo para `app/globals.css` (tokens, tipografia Archivo/Instrument Sans via `next/font/google`, componentes). Ajustes feitos ao migrar: `.ao-vivo` e `.linha.subiu` perderam a animação contínua (só respondem a uma ação do usuário); `.btn.pequeno` e `.aba` subiram para 48px de altura mínima. Logos em `public/logo-verde.png` e `public/logo-roxo.png`.
+- `src/ui/Cabecalho.tsx`: cabeçalho/navegação compartilhados (Apuração, Novo boletim, Administração só para admin), usado em `app/layout.tsx`. Lê a sessão via `src/client/usarSessao.ts` (nome/admin vêm das **claims do token**, não de leitura do Firestore — o cliente não tem acesso a `fiscais/*`). Corrigido na etapa 4: `autenticarFiscal` agora garante que o usuário existe no Auth *antes* de gravar a claim (`getUser` → `createUser` se preciso → `setCustomUserClaims` → `createCustomToken`), para a claim já valer desde o primeiro login, não só a partir do segundo.
+- `app/novo/page.tsx`: fluxo câmera → foto → digitar (ordem de tentativa, não opções soltas — ver decisão da etapa 3). QR Codes acumulados em `partes: string[]`; a cada novo QR, roda `decodificarBU(partes)` de novo. Sucesso leva direto à conferência; `QR_FALTANDO` mostra o que falta e continua; qualquer outro erro (cadeia quebrada, urna diferente, versão desconhecida) **reinicia a leitura do zero**, porque um erro desses invalida o conjunto acumulado.
+  - **Simplificação em relação ao protótipo:** não pede zona/secção antes de escanear — vem do próprio QR Code decodificado. Só a digitação pede zona/seção (via `<select>` populado por `config/publico`, lido direto do Firestore pelo cliente, que é público).
+- `src/ui/DigitarBoletim.tsx`: digitação da urna inteira, sem lista fixa de candidatos (linhas "número + votos" adicionadas livremente, por cargo; "número do partido + votos de legenda" nos proporcionais). Reusa `validarCargosDigitados` (mesma validação do servidor) para conferência ao vivo no formulário.
+- `src/client/leitorQr.ts`: envolve `html5-qrcode` para a câmera (`#leitor`) e para decodificar uma foto (`#leitor-oculto`, mesmo padrão do protótipo). `jsqr` continua só nos scripts Node (`scripts/extrair-qr-exemplos.mjs`), não vai para o bundle do navegador.
+- **Foto do BU:** `src/client/fila-offline.ts`/`app/novo/page.tsx` sobem a foto pro Storage (`boletins/{uid}/...`) só na hora de enviar (ou de processar a fila), nunca antes — assim uma foto tirada offline não trava a captura.
+- **Fila offline** (`src/client/fila-offline.ts`, IndexedDB): ao enviar, se `fetch` falhar com `TypeError` (sem rede), o boletim (payload + foto, se houver) fica salvo no aparelho; `usarFilaOffline` tenta de novo a cada 30s e no evento `online`. **Testado de ponta a ponta com Playwright** (offline forçado via `context.set_offline`): mostra o aviso "sem conexão", guarda o pendente, e envia sozinho ao voltar a conexão.
+- `src/client/firebase.ts`: o SDK do **navegador** só liga nos emuladores com `NEXT_PUBLIC_USE_EMULATORS=true` (variável separada de `FIRESTORE_EMULATOR_HOST`, que só o servidor enxerga).
+- **Bug real encontrado pelo teste manual:** `recomecar()` não limpava `resultadoFinal`, então "Cadastrar outra urna" não saía da tela de resultado. Corrigido.
+- **Confirmado com Playwright contra `next dev` + emuladores reais** (não só chamando funções): login → digitar os 5 cargos (com e sem legenda) → conferência → envio, com verificação direta no Firestore de que `boletins`, `totais` e `mapa` ficaram corretos; e o cenário offline completo.
+- **Não verificado manualmente:** a leitura por câmera ao vivo (`html5-qrcode` com `facingMode: 'environment'`) não pôde ser testada neste ambiente (sem câmera). O código segue o mesmo padrão testado do protótipo, mas **vale testar num celular de verdade antes do dia da eleição**.
+- Painel do administrador (`/admin`) ainda não existe; o item de navegação só aparece pra quem tem a claim `admin`, mas a rota em si é etapa 6.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

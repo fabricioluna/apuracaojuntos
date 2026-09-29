@@ -37,14 +37,18 @@ export async function autenticarFiscal(codigo: string, identificador: string): P
 
   const doc = achou.docs[0]!;
   const { nome, admin = false } = doc.data() as { nome: string; admin?: boolean };
+
+  // Garante que o usuário já existe no Auth antes de gravar a claim, inclusive no primeiro login
+  // desta pessoa. Sem isso, a claim só pegaria a partir do segundo login, e uma renovação silenciosa
+  // do token (depois de ~1h com o app aberto) perderia "admin" e "nome" antes disso. A conferência de
+  // ativo/admin ao vivo no Firestore (exigirFiscal) continua sendo a autorização que vale de verdade;
+  // isto é só para a interface não errar o que mostra.
+  await auth()
+    .getUser(doc.id)
+    .catch(() => auth().createUser({ uid: doc.id }));
+  await auth().setCustomUserClaims(doc.id, { fiscal: true, admin, nome });
   const token = await auth().createCustomToken(doc.id, { fiscal: true, admin, nome });
-  // Ajuda a claim a sobreviver a renovações silenciosas do token; não é crítico (exigirFiscal sempre
-  // confere ativo/admin direto no Firestore), então uma falha aqui não impede o login.
-  try {
-    await auth().setCustomUserClaims(doc.id, { fiscal: true, admin, nome });
-  } catch {
-    /* usuário ainda não existe no Auth (primeiro login); será criado ao trocar o token no cliente */
-  }
+
   await limparTentativas(identificador);
   return { ok: true, token, nome, admin };
 }

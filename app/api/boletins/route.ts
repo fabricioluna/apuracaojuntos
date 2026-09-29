@@ -20,8 +20,8 @@ import type { BoletimEntrada, CargoEntrada } from '../../../src/domain/types';
  * mistura de cargos por QR Code com outros digitados: ou o boletim inteiro veio do QR Code, ou o
  * fiscal digitou o boletim inteiro olhando o papel.
  */
-interface CorpoQR { partes: string[] }
-interface CorpoDigitado { zona: number; secao: number; turno: number; digitado: Partial<Record<CargoId, CargoDigitado>> }
+interface CorpoQR { partes: string[]; fotoPath?: string }
+interface CorpoDigitado { zona: number; secao: number; turno: number; digitado: Partial<Record<CargoId, CargoDigitado>>; fotoPath?: string }
 
 function ehCorpoQR(c: unknown): c is CorpoQR {
   return Array.isArray((c as CorpoQR)?.partes) && (c as CorpoQR).partes.length > 0;
@@ -35,6 +35,11 @@ export async function POST(req: Request): Promise<Response> {
 
     const config = await lerConfigCidade();
     const permitirTeste = process.env.PERMITIR_BU_TESTE === 'true';
+
+    const fotoPath = (corpo as { fotoPath?: unknown }).fotoPath;
+    if (fotoPath !== undefined && (typeof fotoPath !== 'string' || !fotoPath.startsWith(`boletins/${fiscal.uid}/`))) {
+      return NextResponse.json({ erro: 'A foto enviada não pertence a este fiscal.' }, { status: 400 });
+    }
 
     let entrada: BoletimEntrada;
 
@@ -70,6 +75,8 @@ export async function POST(req: Request): Promise<Response> {
       if (!v.ok) return NextResponse.json({ erro: v.mensagens[0], erros: v.mensagens }, { status: 422 });
       entrada = { zona: c.zona, secao: c.secao, turno: c.turno as 1 | 2, cargos: v.cargos };
     }
+
+    if (fotoPath) entrada.fotoPath = fotoPath;
 
     const errosDominio = validarBoletim(entrada, config, permitirTeste);
     if (errosDominio.length) return NextResponse.json({ erro: errosDominio[0]!.mensagem, erros: errosDominio }, { status: 422 });

@@ -80,4 +80,19 @@ describe('POST /api/boletins', () => {
     const r = await POST(req({ zona: 9, secao: 17, turno: 1, digitado: { presidente: { votos: { '10': 1 }, branco: 0, nulo: 0, total: 1 } } }, idToken));
     expect(r.status).toBe(422);
   });
+
+  it('grava a referência da foto quando pertence ao próprio fiscal', async () => {
+    const { idToken, uid } = await loginComoFiscal('Fiscal Com Foto');
+    const fotoPath = `boletins/${uid}/1234-prova.jpg`;
+    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPath }, idToken));
+    expect(r.status).toBe(200);
+    const boletim = await db().collection('boletins').doc('9-16-1').get();
+    expect(boletim.data()!.fotoPath).toBe(fotoPath);
+  });
+
+  it('recusa foto que não pertence ao fiscal autenticado', async () => {
+    const { idToken } = await loginComoFiscal('Fiscal Malicioso');
+    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPath: 'boletins/outra-pessoa/foto.jpg' }, idToken));
+    expect(r.status).toBe(400);
+  });
 });

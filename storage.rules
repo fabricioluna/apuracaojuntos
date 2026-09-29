@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Foto do boletim: só é anexada quando algum QR Code falha (câmera e foto), como prova de
+// auditoria. Cada fiscal só escreve na própria pasta; leitura é do próprio fiscal ou do
+// administrador. Nada de leitura pública.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /boletins/{fiscalUid}/{arquivo} {
+      allow read: if request.auth != null && (request.auth.uid == fiscalUid || request.auth.token.admin == true);
+      allow write: if request.auth != null
+        && request.auth.uid == fiscalUid
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+    match /{tudoMais=**} {
+      allow read, write: if false;
+    }
+  }
+}
