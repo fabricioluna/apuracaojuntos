@@ -3,8 +3,12 @@ import { useEffect, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO } from '../../bu/cargos';
 import { listarBoletins, obterBoletim } from '../../client/admin';
 import { usarConfigCidade } from '../../client/config';
+import { nomeCandidato, nomePartido, type ListaCandidatos } from '../../domain/candidatos';
 import type { BoletimGravado } from '../../domain/types';
 import type { BoletimResumo } from '../../server/admin/listar-boletins';
+import candidatosJson from '../../../data/candidatos.json';
+
+const CANDIDATOS = candidatosJson as ListaCandidatos;
 
 const fmt = (n: number) => Number(n || 0).toLocaleString('pt-BR');
 const hora = (ts: number) => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -131,13 +135,17 @@ function DetalheBoletim({ id }: { id: string }) {
               <tbody>
                 {Object.entries(c.votos).map(([n, v]) => (
                   <tr key={n}>
-                    <td>Candidato {n}</td>
+                    <td>
+                      {nomeCandidato(CANDIDATOS, cid, n)} <span style={{ color: 'var(--muted)' }}>{n}</span>
+                    </td>
                     <td className="n">{fmt(v)}</td>
                   </tr>
                 ))}
                 {Object.entries(c.legenda).map(([n, v]) => (
                   <tr key={`l${n}`}>
-                    <td>Legenda do partido {n}</td>
+                    <td>
+                      Legenda: {nomePartido(CANDIDATOS, cid, n)} <span style={{ color: 'var(--muted)' }}>{n}</span>
+                    </td>
                     <td className="n">{fmt(v)}</td>
                   </tr>
                 ))}

@@ -17,6 +17,7 @@ docs/*.pdf
 docs/tse-exemplos-boletim-urna-eleicoes-2018/
 docs/tse-lista-hashes-chave-publica-eleicoes-2018/
 docs/locais.csv
+docs/CANDIDATOS-PE-*.xlsx
 ui-debug.log
 database-debug.log
 storage-debug.log

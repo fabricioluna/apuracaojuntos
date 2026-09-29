@@ -9,10 +9,11 @@ import { locaisFaltando, locaisPorSituacao } from '../src/domain/locais';
 import { usarConfigCidade } from '../src/client/config';
 import { usarMapa, usarTotaisCargo, type TotaisCargo } from '../src/client/totais';
 import { IconeInfo } from '../src/ui/icones';
+import candidatosJson from '../data/candidatos.json';
 
-// Lista oficial de candidatos: ainda não importada (ver CLAUDE.md > Candidatos). Até lá, todo
-// mundo aparece só pelo número, como pede a regra do app.
-const CANDIDATOS: ListaCandidatos = {};
+// Lista oficial de candidatos, importada de data/candidatos.json (scripts/importar-candidatos.mjs).
+// Quem não está na lista aparece como "Candidato NNNN", como pede a regra do app.
+const CANDIDATOS = candidatosJson as ListaCandidatos;
 
 const fmt = (n: number) => Number(n || 0).toLocaleString('pt-BR');
 const pct = (a: number, b: number) => (b ? ((a / b) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '0,0%');
@@ -177,7 +178,7 @@ export default function PaginaApuracao() {
                           <span className="fill" style={{ width: `${(l.votos / maxV) * 100}%` }} />
                         </span>
                       </button>
-                      {aberta && <div className="detalhe">{detalheLinha(l, totais, cargoAtual, urnasApuradas, validos)}</div>}
+                      {aberta && <div className="detalhe">{detalheLinha(l, totais, cargoAtual, urnasApuradas, validos, CANDIDATOS)}</div>}
                     </div>
                   );
                 })}
@@ -197,12 +198,12 @@ export default function PaginaApuracao() {
   );
 }
 
-function detalheLinha(l: Linha, t: TotaisCargo, cargoId: CargoId, urnasApuradas: number, validos: number): string {
+function detalheLinha(l: Linha, t: TotaisCargo, cargoId: CargoId, urnasApuradas: number, validos: number, candidatos: ListaCandidatos): string {
   if (l.chave === 'legenda') {
     const partidos = Object.entries(t.legenda)
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
-      .map(([n, v]) => `${nomePartido({}, cargoId, n)} (${n}): ${fmt(v)}`)
+      .map(([n, v]) => `${nomePartido(candidatos, cargoId, n)} (${n}): ${fmt(v)}`)
       .join('; ');
     return `Votos de legenda: ${fmt(l.votos)}, ${pct(l.votos, t.total)} do total apurado. Por partido: ${partidos || 'nenhum ainda'}.`;
   }
