@@ -128,7 +128,8 @@ O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes s
 - `scripts/env-da-chave.mjs <chave.json>`: grava as variáveis `FIREBASE_*` no `.env.local` a partir da chave de conta de serviço baixada do console.
 - `scripts/definir-config.mjs <cidade.json>`: grava `config/publico`. Variáveis `CIDADE_UF`, `CIDADE_CODIGO_MUNICIPIO`, `CIDADE_TURNO` sobrepõem os padrões (PE/25178/1).
 - `scripts/cadastrar-fiscal.mjs "Nome" [--admin]`: gera um código, grava o hash em `fiscais` e imprime o código uma única vez.
-- Todos os três, com `FIRESTORE_EMULATOR_HOST`/`FIREBASE_AUTH_EMULATOR_HOST` definidos, gravam no emulador em vez do projeto real — é assim que os testes semeiam dados.
+- `scripts/trocar-codigo.mjs "Nome exatamente como está em fiscais"`: gera um **novo** código pra um cadastro que já existe (fiscal ou administrador), pra quando o código mostrado uma vez foi perdido. Mantém o mesmo documento (nome, claim `admin`, histórico); só troca o hash. O código antigo para de funcionar.
+- Todos os quatro, com `FIRESTORE_EMULATOR_HOST`/`FIREBASE_AUTH_EMULATOR_HOST` definidos, gravam no emulador em vez do projeto real — é assim que os testes semeiam dados.
 
 ## Testes de servidor (emulador)
 
