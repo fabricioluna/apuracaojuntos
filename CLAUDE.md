@@ -98,5 +98,50 @@ Aprovadas pela responsável pelo projeto:
 Adotadas por padrão (propostas do plano, ainda revisáveis):
 - 2º turno exige os cargos configurados para o turno, não sempre os cinco.
 - Em produção só `FASE:O` (oficial); simulado e treinamento só em ambiente de teste. UF e município do BU precisam bater com a configuração.
-- Login dos fiscais por Google, restrito à lista de fiscais.
 - Nos deputados, "Votos de legenda" aparece como barra neutra, com detalhe por partido; % dos candidatos sobre os válidos (nominais + legenda).
+
+Decididas na etapa 3, substituindo propostas anteriores:
+- **Login: código numérico único por pessoa, sem e-mail nem senha** (não Google). O administrador (fabricioluna@gmail.com) usa o mesmo mecanismo; o que muda é a claim `admin`. Fluxo: `POST /api/auth/entrar {codigo}` confere o hash do código em `fiscais`, devolve um **custom token** do Firebase Auth; o cliente troca por um ID token com `signInWithCustomToken`. `exigirFiscal`/`exigirAdmin` sempre conferem `ativo`/`admin` **ao vivo no Firestore** a cada requisição, não confiam só na claim do token (que pode ficar até 1h desatualizada).
+- **Sem foto do BU no Storage** (decisão explícita, revertendo o pedido original de "prova de auditoria"): mais simples, sem plano Blaze. Consequência: nada para comparar visualmente numa divergência; a tela de divergências (etapa 6) mostra só os números. `Storage` não é criado.
+- Limite de tentativas de login: 8 tentativas erradas por identificador (IP) a cada 15 minutos.
+
+## Descoberta sobre o BU real: não existe QR Code por cargo
+
+O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes são pedaços sequenciais de um texto único (cortados por tamanho, não por cargo). Se um QR Code está ilegível, normalmente **não dá pra aproveitar parte da leitura**: o fiscal digita o boletim inteiro, não um cargo isolado. Por isso a rota de gravação só aceita OU todos os QR Codes (decodificados de uma vez) OU todos os cinco cargos digitados — nunca uma mistura. Isso muda a tela de "Novo boletim" da etapa 4 em relação ao protótipo.
+
+## Arquitetura do servidor (etapa 3)
+
+- `src/domain/`: tipos, validação de política (`validar-boletim.ts`), validação dos valores digitados (`validar-digitado.ts`), comparação campo a campo e impressão digital de um boletim (`comparar.ts`) — tudo sem Firebase, testável isolado.
+- `src/server/`: Admin SDK (`firebase-admin.ts`, detecta o emulador via `FIRESTORE_EMULATOR_HOST` e dispensa credencial real nesse caso), config da cidade, login (`fiscal-auth.ts`), autorização de requisição (`autenticar-requisicao.ts`), e as duas transações centrais: `gravar-boletim.ts` (regra de urna repetida/divergência) e `resolver-divergencia.ts` (decisão do administrador).
+- `app/api/auth/entrar`, `app/api/boletins`, `app/api/divergencias/[id]`: rotas do App Router, funções `POST`/`PATCH` exportadas — testáveis chamando a função direto com um `Request` do Web, sem precisar do `next dev`.
+- **Totais** (`totais/{turno}_{cargo}`): incrementos em campos de mapa aninhado (`votos.<numero>`, `legenda.<numero>`), com `FieldValue.increment`. **Testado no emulador:** um incremento aninhado só toca a chave indicada (não apaga as outras), funciona em documento inexistente, e duas transações concorrentes em chaves diferentes do mesmo mapa não se perdem.
+- **Mapa** (`mapa/{turno}`): `{ secoes: { "<zona>-<secao>": "ok" | "div" }, ultimo }`.
+- Divergência: ID determinístico `${idBoletim}_${impressãoDigital(novo)}` — mesmo envio divergente repetido nunca duplica o documento.
+- `boletins/{id}/versoes/{auto}`: cópia do cadastro anterior quando o administrador escolhe "usar o novo".
+- **Pendente para a etapa 5:** os campos "lidera em N urnas" e "melhor urna" do protótipo não foram implementados nos totais; a etapa 5 decide como calculá-los sem expor os boletins brutos ao público.
+
+## Scripts de operação
+
+- `scripts/env-da-chave.mjs <chave.json>`: grava as variáveis `FIREBASE_*` no `.env.local` a partir da chave de conta de serviço baixada do console.
+- `scripts/definir-config.mjs <cidade.json>`: grava `config/publico`. Variáveis `CIDADE_UF`, `CIDADE_CODIGO_MUNICIPIO`, `CIDADE_TURNO` sobrepõem os padrões (PE/25178/1).
+- `scripts/cadastrar-fiscal.mjs "Nome" [--admin]`: gera um código, grava o hash em `fiscais` e imprime o código uma única vez.
+- Todos os três, com `FIRESTORE_EMULATOR_HOST`/`FIREBASE_AUTH_EMULATOR_HOST` definidos, gravam no emulador em vez do projeto real — é assim que os testes semeiam dados.
+
+## Testes de servidor (emulador)
+
+- Rodar antes: `npx firebase-tools emulators:start --only firestore,auth --project apuracaojuntos` (Java já está instalado). `tests/setup-emulador.ts` aponta os testes para `127.0.0.1:8080`/`9099`.
+- **Importante:** o projeto de teste usa o **mesmo id do projeto real** (`apuracaojuntos`) de propósito. O emulador de Auth foi iniciado com `--project apuracaojuntos` e fixa esse projeto nas trocas de `signInWithCustomToken`; um id diferente (`apuracaojuntos-teste`, por exemplo) causa erro de "aud incorreto" no `verifyIdToken`. Isso é seguro: com as variáveis de emulador definidas, nada sai do computador.
+- `tests/helpers/emulador.ts`: `limparEmulador()` (apaga Firestore e Auth do projeto de teste), `seedFiscal`, `loginComoFiscal` (login real de ponta a ponta: código → custom token → troca no Auth emulator → ID token).
+- `tests/rules/firestore.test.ts`: `@firebase/rules-unit-testing` contra as `firestore.rules` reais.
+- Os arquivos de teste rodam em série (`fileParallelism: false`): o emulador é uma instância única e paralelizar causa timeouts por contenção, não bugs.
+- **Confirmado com um teste manual de ponta a ponta** (`next dev` apontado para o emulador, chamadas HTTP reais): login por código, envio de boletim (novo → igual) funcionam através do servidor de verdade, não só das funções chamadas direto.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

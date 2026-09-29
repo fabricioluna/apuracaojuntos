@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Fiscais e o administrador nunca escrevem direto no Firestore: tudo passa pela rota de API,
+// que usa o Firebase Admin SDK (e por isso ignora estas regras). Aqui só definimos o que o
+// cliente (navegador) pode LER sem estar logado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Painel público: só os totais por cargo, o mapa de urnas e a configuração pública.
+    match /totais/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /mapa/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /config/publico {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Tudo o mais (boletins, divergências, fiscais, versões, tentativas de login) é privado:
+    // só o servidor (Admin SDK) lê e escreve.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

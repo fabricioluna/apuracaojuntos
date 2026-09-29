@@ -1,0 +1,3 @@
+/* Reset mínimo. O visual completo do protótipo (tokens de cor, tipografia, navegação) entra na etapa 4/5. */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; }

@@ -10,3 +10,12 @@ firebase-debug.log
 firestore-debug.log
 serviceAccount*.json
 *firebase-adminsdk*.json
+
+# Manuais e exemplos do TSE: não redistribuir (ver CLAUDE.md). Os textos usados nos testes já
+# estão extraídos em tests/fixtures/.
+docs/*.pdf
+docs/tse-exemplos-boletim-urna-eleicoes-2018/
+docs/tse-lista-hashes-chave-publica-eleicoes-2018/
+docs/locais.csv
+ui-debug.log
+database-debug.log
