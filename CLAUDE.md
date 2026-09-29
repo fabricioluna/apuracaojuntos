@@ -120,7 +120,8 @@ O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes s
 - **Mapa** (`mapa/{turno}`): `{ secoes: { "<zona>-<secao>": "ok" | "div" }, ultimo }`.
 - Divergência: ID determinístico `${idBoletim}_${impressãoDigital(novo)}` — mesmo envio divergente repetido nunca duplica o documento.
 - `boletins/{id}/versoes/{auto}`: cópia do cadastro anterior quando o administrador escolhe "usar o novo".
-- **Pendente para a etapa 5:** os campos "lidera em N urnas" e "melhor urna" do protótipo não foram implementados nos totais; a etapa 5 decide como calculá-los sem expor os boletins brutos ao público.
+- **"Lidera" e "melhor urna" (implementado na etapa 5):** ficam dentro do próprio documento de totais (`totais/{turno}_{cargo}.lidera: {numero: contagem}` e `.melhor: {numero: {votos,zona,secao}}`), calculados na mesma transação — o público nunca lê boletins individuais. Ver `src/domain/lideranca.ts` (funções puras, testadas sem emulador) e `src/server/totais.ts` (`lerMelhorAtual`, `ajustarLidera`, `aplicarMelhorUrna`). Como o Firestore exige todas as leituras antes de qualquer escrita numa transação, `gravar-boletim.ts` e `resolver-divergencia.ts` leem o "melhor" atual de cada cargo *antes* de gravar o boletim/decisão.
+  - **Limitação aceita:** "melhor urna" só evolui para frente. Se uma correção de divergência *reduz* os votos de uma seção que era a melhor de algum candidato, o valor antigo fica registrado até outra urna o superar (não recalculamos varrendo todos os boletins). "Lidera" não tem essa limitação: numa correção, decrementa o vencedor antigo e incrementa o novo, exatamente.
 
 ## Scripts de operação
 
@@ -153,6 +154,15 @@ O protótipo simplificava "um QR Code por cargo". No formato real, os QR Codes s
 - **Confirmado com Playwright contra `next dev` + emuladores reais** (não só chamando funções): login → digitar os 5 cargos (com e sem legenda) → conferência → envio, com verificação direta no Firestore de que `boletins`, `totais` e `mapa` ficaram corretos; e o cenário offline completo.
 - **Não verificado manualmente:** a leitura por câmera ao vivo (`html5-qrcode` com `facingMode: 'environment'`) não pôde ser testada neste ambiente (sem câmera). O código segue o mesmo padrão testado do protótipo, mas **vale testar num celular de verdade antes do dia da eleição**.
 - Painel do administrador (`/admin`) ainda não existe; o item de navegação só aparece pra quem tem a claim `admin`, mas a rota em si é etapa 6.
+
+## Etapa 5: painel público em tempo real
+
+- `app/page.tsx`: uma aba por cargo (só os do turno atual), grade de urnas coloridas por status, gráfico de barras com candidatos ordenados por votos, brancos/nulos opcionais (`mostrarBN`, não persiste entre recargas — decisão deliberada, é só uma conveniência de sessão), % sobre os votos válidos, detalhe ao tocar (lidera/melhor urna). Aviso de "totalização paralela e não oficial" sempre visível no topo.
+- **Nunca lê boletins.** Só `totais/{turno}_{cargo}` (`src/client/totais.ts`, `usarTotaisCargo`) e `mapa/{turno}` (`usarMapa`), ambos via `onSnapshot` — atualiza sozinho quando um boletim novo chega, sem recarregar a página. `config/publico` dá o total de seções da cidade (para "X de M urnas apuradas") e o turno.
+- **Deputados:** "Votos de legenda" some quando nenhum partido recebeu legenda ainda (`legendaTotal > 0`), e aparece como barra neutra com o detalhe por partido ao tocar, como decidido na etapa 3.
+- **Nomes de candidatos:** `src/domain/candidatos.ts` (`nomeCandidato`/`nomePartido`) — lista vazia por enquanto (`data/candidatos.json` ainda não existe), então todo mundo aparece como "Candidato NNNN"/"Partido NN". A importação da lista oficial do TSE continua pendente (não é desta etapa; ver o pedido original sobre candidatos).
+- **Bug real encontrado pelo teste manual:** `.fill` (a barra preenchida do gráfico) é um `<span>`, que por padrão é `display: inline` — CSS ignora `width`/`height` em elementos inline não substituídos, então a barra não aparecia preenchida (só o trilho de fundo). Faltava `display: block` em `.fill`. Corrigido em `app/globals.css`; conferido pixel a pixel via `getComputedStyle` antes e depois da correção.
+- **Confirmado com Playwright contra `next dev` + os três emuladores:** três urnas digitadas com candidatos e votos diferentes, painel público mostra os totais corretos e ao vivo, abas trocam de cargo, toque na barra mostra "lidera em N de M urnas" e "melhor resultado" com zona/seção corretos, grade de urnas colorida, aviso de não-oficial sempre visível.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

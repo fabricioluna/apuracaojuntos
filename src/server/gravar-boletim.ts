@@ -1,8 +1,9 @@
 import { CARGOS_ORDEM } from '../bu/cargos';
 import { chaveUrna, compararBoletins, impressaoDigital } from '../domain/comparar';
+import { melhorasDeMelhorUrna, vencedorDaUrna } from '../domain/lideranca';
 import type { BoletimEntrada, BoletimGravado, ResultadoEnvio } from '../domain/types';
 import { db } from './firebase-admin';
-import { ajustarTotais, atualizarMapa } from './totais';
+import { ajustarLidera, ajustarTotais, aplicarMelhorUrna, atualizarMapa, lerMelhorAtual } from './totais';
 
 function paraBoletimGravado(entrada: BoletimEntrada, extra: Pick<BoletimGravado, 'id' | 'fiscalId' | 'fiscalNome' | 'enviadoEm'>): BoletimGravado {
   let base: BoletimGravado = { ...extra, zona: entrada.zona, secao: entrada.secao, turno: entrada.turno, cargos: entrada.cargos };
@@ -30,10 +31,20 @@ export async function gravarBoletim(
     const atualSnap = await t.get(ref);
 
     if (!atualSnap.exists) {
+      // Todas as leituras (inclusive as de "melhor urna" de cada cargo) precisam vir antes de
+      // qualquer escrita nesta transação.
+      const melhorAtualPorCargo: Partial<Record<(typeof CARGOS_ORDEM)[number], Awaited<ReturnType<typeof lerMelhorAtual>>>> = {};
+      for (const cargoId of CARGOS_ORDEM) {
+        if (entrada.cargos[cargoId]) melhorAtualPorCargo[cargoId] = await lerMelhorAtual(t, entrada.turno, cargoId);
+      }
+
       t.set(ref, novo);
       for (const cargoId of CARGOS_ORDEM) {
         const cargo = entrada.cargos[cargoId];
-        if (cargo) ajustarTotais(t, entrada.turno, cargoId, cargo, 1, 1);
+        if (!cargo) continue;
+        ajustarTotais(t, entrada.turno, cargoId, cargo, 1, 1);
+        ajustarLidera(t, entrada.turno, cargoId, vencedorDaUrna(cargo), 1);
+        aplicarMelhorUrna(t, entrada.turno, cargoId, melhorasDeMelhorUrna(cargo, entrada.zona, entrada.secao, melhorAtualPorCargo[cargoId]!));
       }
       atualizarMapa(t, entrada.turno, entrada.zona, entrada.secao, 'ok', true);
       return { status: 'novo' };
