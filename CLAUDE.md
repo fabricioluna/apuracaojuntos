@@ -184,6 +184,20 @@ A pedido da responsável pelo projeto: além da grade abstrata de zona/seção, 
 - `app/page.tsx`: lista colapsável "Locais que ainda faltam (N)", abaixo da grade, com badges tipo `Nome (apuradas/total)`. Independe do cargo selecionado (a lista de urnas com boletim é a mesma para os cinco).
 - **Bug real encontrado pelo teste manual:** usei as classes `.fichas`/`.ficha` (badges) sem elas existirem no CSS — na etapa 4 eu tinha deliberadamente deixado de fora os estilos específicos da Administração do protótipo, e essas classes faziam parte desse bloco pulado. Adicionadas em `app/globals.css`. Confirmado visualmente com os 181 locais reais de Pesqueira.
 
+## Etapa 6: painel do administrador
+
+Priorizado como o pedido original definiu: divergências, fiscais, estatísticas e boletins primeiro (sem divergências resolvidas, elas ficam paradas para sempre); ajustes e exportação por último.
+
+- `app/admin/page.tsx`: abas (Estatísticas, Divergências, Boletins, Fiscais, Ajustes) em uma página só, como o protótipo. Redireciona quem não é administrador.
+- `src/server/admin/`: `listar-boletins.ts`, `listar-divergencias.ts`, `fiscais.ts`, `atualizar-config.ts` — só o servidor lê `boletins`/`divergencias`/`fiscais` (privados); o cliente sempre passa por `app/api/admin/*`, todas atrás de `exigirAdmin`.
+- **Divergências**: `listarDivergencias()` lê o cadastro atual de cada urna na hora (não confia no que ficou salvo dentro do documento da divergência, que pode estar desatualizado se outra divergência da mesma urna já foi resolvida). Resolver reusa a mesma `resolverDivergencia` da etapa 3.
+- **Fiscais**: cadastrar mostra o código uma única vez (não fica salvo em lugar nenhum, igual ao script `cadastrar-fiscal.mjs`, que continua valendo para quem preferir a linha de comando). Desativar/reativar é um `PATCH`.
+- **Estatísticas**: urnas apuradas, divergências pendentes, envios por 30 min e por fiscal (`src/domain/estatisticas.ts`, puro), brancos/nulos por cargo (lidos direto de `totais/*`, público, sem rota própria), locais que faltam (reusa `src/domain/locais.ts` da etapa 5).
+- **Ajustes**: só o turno é editável pela interface (crítico para a transição pro 2º turno). Zonas/seções ficam **só leitura** aqui, de propósito — nosso modelo real guarda aptos e nome do local por seção (não uma contagem simples como o protótipo), e um formulário simples de reimportação poderia apagar esses dados sem querer. Trocar zonas continua sendo `scripts/definir-config.mjs`. Não incluí um botão de "apagar todos os dados": era só um recurso de demonstração do protótipo (ligado ao localStorage), perigoso demais para um Firestore de verdade, e não fazia parte do pedido original.
+- **Bug real encontrado pelo teste manual:** a lista de Boletins não sinalizava quando uma urna tinha divergência pendente (só mostrava "Confere" ou "Validado", igual pra uma urna com problema aguardando validação). `listarBoletins` passou a cruzar com as divergências pendentes; a coluna Situação agora mostra "Divergência pendente" também.
+- **Deixado de fora, como combinado:** exportação em Excel/CSV. Pode ser feita direto pelo console do Firebase por enquanto.
+- 153 testes automatizados + as cinco abas conferidas com Playwright contra `next dev` e os três emuladores (divergência criada e resolvida lado a lado, fiscal cadastrado e desativado, estatísticas com dados reais, boletim aberto com detalhe por cargo, turno trocado).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
