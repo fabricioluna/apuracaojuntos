@@ -12,6 +12,7 @@ import { usarConfigCidade } from '../../src/client/config';
 import { salvarPendente } from '../../src/client/fila-offline';
 import { clientStorage } from '../../src/client/firebase';
 import { iniciarCamera, lerArquivo, pararCamera } from '../../src/client/leitorQr';
+import { lerBoletimComIA, type SugestaoCargo } from '../../src/client/lerBoletimIA';
 import { chamarApi } from '../../src/client/sessao';
 import { usarFilaOffline } from '../../src/client/usarFilaOffline';
 import { usarSessao } from '../../src/client/usarSessao';
@@ -37,6 +38,8 @@ export default function PaginaNovoBoletim() {
   const [mensagem, setMensagem] = useState<{ tipo: 'erro' | 'ok' | 'aviso'; texto: string } | null>(null);
   const [escaneando, setEscaneando] = useState(false);
   const [foto, setFoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [lendoIA, setLendoIA] = useState(false);
+  const [sugestaoIA, setSugestaoIA] = useState<Partial<Record<CargoId, SugestaoCargo>> | null>(null);
   const [zonaDigitado, setZonaDigitado] = useState('');
   const [secaoDigitado, setSecaoDigitado] = useState('');
   const [origem, setOrigem] = useState<OrigemBoletim | null>(null);
@@ -105,11 +108,32 @@ export default function PaginaNovoBoletim() {
     }
   }
 
+  async function aoLerComIA() {
+    if (!foto) return;
+    setLendoIA(true);
+    setMensagem({ tipo: 'aviso', texto: 'Lendo a foto com IA…' });
+    try {
+      const r = await lerBoletimComIA(foto.blob, foto.blob.type || 'image/jpeg');
+      setSugestaoIA(r.cargos);
+      setMensagem(
+        r.avisos.length
+          ? { tipo: 'aviso', texto: `${r.avisos[0]} Confira todos os valores contra o papel antes de enviar.` }
+          : { tipo: 'ok', texto: 'Consegui ler a foto. Confira cada valor contra o boletim impresso antes de continuar.' },
+      );
+      setVista('digitar-urna');
+    } catch (e) {
+      setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não consegui ler essa foto com IA. Tente de novo ou digite os valores.' });
+    } finally {
+      setLendoIA(false);
+    }
+  }
+
   function recomecar() {
     pararCamera();
     setEscaneando(false);
     setPartes([]);
     setFoto(null);
+    setSugestaoIA(null);
     setOrigem(null);
     setMensagem(null);
     setZonaDigitado('');
@@ -192,7 +216,7 @@ export default function PaginaNovoBoletim() {
         {vista === 'leitura' && (
           <section className="painel">
             <h1>Novo boletim</h1>
-            <p className="lead">Leia os QR Codes do boletim com a câmera. Se algum não ler, tire uma foto; se nem assim der certo, digite os valores.</p>
+            <p className="lead">Leia os QR Codes do boletim com a câmera. Se algum não ler, tire ou escolha uma foto — dá pra tentar ler os números com IA a partir dela; se nem assim der certo, digite os valores.</p>
             <div className="leitura">
               <div className="linha-botoes">
                 {!escaneando ? (
@@ -228,6 +252,13 @@ export default function PaginaNovoBoletim() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={foto.url} alt="Foto do boletim anexada" />
                   <span>Foto anexada como prova.</span>
+                </div>
+              )}
+              {foto && (
+                <div className="linha-botoes">
+                  <button className="btn ghost" disabled={lendoIA} onClick={aoLerComIA}>
+                    {lendoIA ? 'Lendo…' : 'Tentar ler os números com IA'}
+                  </button>
                 </div>
               )}
             </div>
@@ -289,7 +320,7 @@ export default function PaginaNovoBoletim() {
               Zona {zonaDigitado}, seção {secaoDigitado}
             </h1>
             <p className="lead">Digite os números como estão impressos no boletim. Deixe em branco o que for zero.</p>
-            <DigitarBoletim exigidos={exigidos} onPronto={aoTerminarDigitacao} />
+            <DigitarBoletim exigidos={exigidos} sugestao={sugestaoIA ?? undefined} onPronto={aoTerminarDigitacao} />
           </section>
         )}
 

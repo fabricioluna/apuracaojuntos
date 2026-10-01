@@ -15,6 +15,7 @@ import { candidatosDoCargo, partidosDoCargo, type ListaCandidatos } from '../dom
 import type { CargoDigitado } from '../domain/validar-digitado';
 import { validarCargosDigitados } from '../domain/validar-digitado';
 import type { CargoEntrada } from '../domain/types';
+import type { SugestaoCargo } from '../server/ler-boletim-ia';
 import { SeletorCandidato } from './SeletorCandidato';
 import candidatosJson from '../../data/candidatos.json';
 
@@ -36,6 +37,22 @@ interface EstadoCargo {
 const linhaVazia = (): LinhaNumero => ({ chave: crypto.randomUUID(), numero: '', votos: '' });
 const cargoVazio = (): EstadoCargo => ({ candidatos: [linhaVazia()], legenda: [], branco: '', nulo: '' });
 
+/** Converte a sugestão da leitura por IA (src/server/ler-boletim-ia.ts) pro formato do formulário.
+ * branco/nulo que a IA não leu com confiança ficam em branco de propósito (não "0") — assim caem
+ * na mesma sinalização de "campo em branco" que já existe pra digitação manual, em vez de passar
+ * despercebido como se fosse um valor confirmado. */
+function estadoDeSugestao(cargo: SugestaoCargo | undefined): EstadoCargo {
+  if (!cargo) return cargoVazio();
+  const candidatos = Object.entries(cargo.votos).map(([numero, votos]) => ({ chave: crypto.randomUUID(), numero, votos: String(votos) }));
+  const legenda = Object.entries(cargo.legenda ?? {}).map(([numero, votos]) => ({ chave: crypto.randomUUID(), numero, votos: String(votos) }));
+  return {
+    candidatos: candidatos.length ? candidatos : [linhaVazia()],
+    legenda,
+    branco: cargo.branco !== undefined ? String(cargo.branco) : '',
+    nulo: cargo.nulo !== undefined ? String(cargo.nulo) : '',
+  };
+}
+
 /** Texto em branco conta como zero (sinalizado na interface, não bloqueia). */
 function paraNumero(txt: string): number {
   return txt.trim() === '' ? 0 : Number(txt);
@@ -52,14 +69,18 @@ function paraCargoDigitado(e: EstadoCargo): CargoDigitado {
 
 export function DigitarBoletim({
   exigidos,
+  sugestao,
   onPronto,
 }: {
   exigidos: CargoId[];
+  /** Pré-preenchimento vindo da leitura por foto com IA (ver app/novo/page.tsx). Opcional: sem
+   * isso, o formulário começa vazio, igual sempre foi. */
+  sugestao?: Partial<Record<CargoId, SugestaoCargo>>;
   onPronto: (cargos: Partial<Record<CargoId, CargoEntrada>>) => void;
 }) {
   const [estado, setEstado] = useState<Record<CargoId, EstadoCargo>>(() => {
     const s = {} as Record<CargoId, EstadoCargo>;
-    for (const id of exigidos) s[id] = cargoVazio();
+    for (const id of exigidos) s[id] = estadoDeSugestao(sugestao?.[id]);
     return s;
   });
   // Só o primeiro cargo começa aberto — evita uma rolagem gigante com tudo expandido de uma vez.
@@ -81,6 +102,11 @@ export function DigitarBoletim({
 
   return (
     <div className="pilha">
+      {sugestao && (
+        <p className="msg aviso" role="status">
+          Valores sugeridos por uma leitura automática da foto — a IA pode errar. Confira cada um contra o boletim impresso antes de continuar.
+        </p>
+      )}
       {exigidos.map(id => (
         <CargoDigitavel
           key={id}
