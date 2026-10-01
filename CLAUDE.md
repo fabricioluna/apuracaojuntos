@@ -263,6 +263,13 @@ A responsável pelo projeto reportou, com print, os campos "Candidato"/"Votos"/"
 - **Correção:** acrescentar `*::details-content` na mesma regra de reset, em `app/globals.css`. Uma linha, resolve em qualquer `<details>` do site (digitação, conferência, boletins do admin), não só onde foi reportado.
 - **Confirmado:** `getBoundingClientRect()` de cada campo batendo exatamente com a largura da sua coluna (sem sobra), nas mesmas resolução e tema do print original, e visualmente também na conferência e no celular. Suíte completa 164/164, `next build` limpo.
 
+## Digitação não pergunta mais a zona
+
+A pedido da responsável pelo projeto: Pesqueira só tem a zona 55 (ver CLAUDE.md > Dados da cidade), então perguntar a zona na digitação manual era um passo a mais sem necessidade.
+
+- `app/novo/page.tsx`: quando `config.zonas` tem só uma zona, ela é preenchida sozinha (`useEffect`) e o `<select>` de zona nem aparece — só sobra a escolha da seção. Se um dia uma cidade tiver mais de uma zona, o seletor volta a aparecer sozinho (`config.zonas.length > 1`), sem precisar mexer em nada.
+- Trocar de zona (nas cidades que tiverem mais de uma) agora limpa a seção escolhida, pra nunca ficar com uma seção de uma zona errada selecionada por engano.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

@@ -48,6 +48,12 @@ export default function PaginaNovoBoletim() {
     if (!carregando && !sessao) router.replace('/entrar');
   }, [carregando, sessao, router]);
 
+  // Pesqueira só tem uma zona (55): preenche sozinho e nem mostra a escolha pro fiscal. Se um dia
+  // uma cidade tiver mais de uma zona, o seletor volta a aparecer (ver vista "digitar-urna").
+  useEffect(() => {
+    if (config?.zonas.length === 1 && !zonaDigitado) setZonaDigitado(String(config.zonas[0]!.zona));
+  }, [config, zonaDigitado]);
+
   // Decodifica de novo a cada QR Code novo. Sucesso leva direto para a conferência.
   useEffect(() => {
     if (partes.length === 0) return;
@@ -230,17 +236,26 @@ export default function PaginaNovoBoletim() {
           <section className="painel">
             <h1>Qual urna você está digitando?</h1>
             <div className="grade-urna">
-              <div className="campo">
-                <label htmlFor="d-zona">Zona</label>
-                <select id="d-zona" value={zonaDigitado} onChange={e => setZonaDigitado(e.target.value)}>
-                  <option value="">Escolha</option>
-                  {config.zonas.map(z => (
-                    <option key={z.zona} value={z.zona}>
-                      {z.zona}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {config.zonas.length > 1 && (
+                <div className="campo">
+                  <label htmlFor="d-zona">Zona</label>
+                  <select
+                    id="d-zona"
+                    value={zonaDigitado}
+                    onChange={e => {
+                      setZonaDigitado(e.target.value);
+                      setSecaoDigitado('');
+                    }}
+                  >
+                    <option value="">Escolha</option>
+                    {config.zonas.map(z => (
+                      <option key={z.zona} value={z.zona}>
+                        {z.zona}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="campo">
                 <label htmlFor="d-secao">Seção</label>
                 <select id="d-secao" value={secaoDigitado} onChange={e => setSecaoDigitado(e.target.value)} disabled={!zonaDigitado}>
