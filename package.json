@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Totalização paralela e não oficial de votos (Construindo Juntos)",
-  "engines": {
-    "node": "22.x"
+  "overrides": {
+    "jose": "^4.15.9"
   },
   "scripts": {
     "dev": "next dev",
