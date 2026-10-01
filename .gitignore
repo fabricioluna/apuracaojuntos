@@ -18,6 +18,10 @@ docs/tse-exemplos-boletim-urna-eleicoes-2018/
 docs/tse-lista-hashes-chave-publica-eleicoes-2018/
 docs/locais.csv
 docs/CANDIDATOS-PE-*.xlsx
+
+# Boletins sintéticos de teste (scripts/gerar-boletins-teste.mjs) — gerados sob pedido, só pra
+# testar a leitura (câmera/foto/IA), nunca pra usar de verdade. Não precisam ir pro repositório.
+docs/boletins-teste/
 ui-debug.log
 database-debug.log
 storage-debug.log

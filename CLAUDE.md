@@ -319,6 +319,16 @@ A responsável pelo projeto perguntou se dava pra usar IA (tipo Gemini) ou OCR t
 4. Redeploy na Vercel pra pegar a variável — **feito**.
 5. Sem crédito disponível (ou sem a chave configurada), o botão "Tentar ler os números com IA" continua aparecendo, mas sempre mostra um aviso claro em vez de travar — o resto do app funciona normal.
 
+## Gerador de boletins de teste (com QR Code de verdade)
+
+A pedido da responsável pelo projeto: boletins **sintéticos**, mas com QR Code que o nosso próprio decodificador aceita de verdade, pra testar escaneamento, foto e leitura por IA sem precisar de uma urna real.
+
+- `scripts/gerar-boletins-teste.mjs [quantidade]`: sorteia candidatos de `data/candidatos.json` e seções reais de `data/cidade/pesqueira.json`, monta o conteúdo do BU campo a campo (mesmo formato que `src/bu/content.ts` interpreta: `IDEL/MAJO/PROP/CARG/TIPO`, candidatos soltos nos majoritários, `PART/LEGP/TOTP` nos proporcionais, resumo `APTA/NOMI/[LEGC]/BRAN/NULO/TOTC`), calcula a cadeia de hashes SHA-512 exatamente como `src/bu/hash.ts` confere, e divide em 1 a 3 QR Codes por urna (varia de propósito, pra testar tanto o caso de 1 QR só quanto o de acumular várias leituras).
+- **`FASE:S` (simulado), nunca `FASE:O`** — o servidor recusa boletins fora de `FASE:O` em produção a não ser que `PERMITIR_BU_TESTE` esteja ligado (ver "Decisões aprovadas"). Assim, mesmo que alguém tente enviar um desses por engano, a apuração de verdade não aceita.
+- Saída em `docs/boletins-teste/<secao>/` (gitignored — são fixtures geradas sob pedido, não precisam ir pro repositório): um `.png` por QR Code (pra escanear com a câmera ou subir como "foto do boletim"), um `relatorio.html` (texto no estilo do boletim real, com nome dos candidatos, mais os QR Codes embutidos no fim — útil pra tirar print ou fotografar a tela e testar a leitura por IA) com um selo vermelho "BOLETIM SIMULADO" bem visível, e um `dados.json` (gabarito, pra conferir o que cada forma de leitura devolveu).
+- **Confirmado com o decodificador de verdade:** `tests/bu/boletins-teste-gerados.test.ts` (só roda quando a pasta existe, mesmo padrão de `tests/bu/cruzar-impresso.test.ts`) decodifica os QR Codes de cada urna gerada com `decodificarBU` e confere campo a campo contra o gabarito — todos batem. **Confirmado também que a imagem do QR Code é escaneável de verdade** (não só o texto): decodifiquei todos os `.png` gerados com `jsQR` direto dos pixels, os 18 bateram.
+- **Bug achado nessa validação:** o gabarito incluía partidos com `legenda: 0`, mas o decodificador descarta de propósito entradas de legenda com valor 0 do resultado final (`src/bu/content.ts`, só inclui `d.legenda > 0`) — o wire format sempre traz `LEGP:0` explícito, mas isso não aparece no `CargoApurado.legenda` devolvido. Corrigido o gabarito pra bater com esse comportamento real (não é um bug do decodificador).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
