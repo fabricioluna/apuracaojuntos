@@ -88,9 +88,15 @@
 html {
   scroll-padding-top: env(safe-area-inset-top, 0px);
 }
+/* ::details-content é o "miolo" interno de um <details> aberto (Chrome recente) — fica entre o
+   <details> e os filhos de verdade pra herança de propriedade, mas não é coberto por *::before/
+   *::after. Sem incluir ele aqui, todo input dentro de um <details> aberto (conferência, admin,
+   digitação) herdava box-sizing:content-box do zero (o padrão do pseudo-elemento), e um input com
+   padding + width:100% passava da largura da coluna. */
 *,
 *::before,
-*::after {
+*::after,
+*::details-content {
   box-sizing: inherit;
 }
 body {

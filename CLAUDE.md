@@ -253,6 +253,16 @@ A pedido da responsável pelo projeto: uma área separada do painel geral, só c
 - Item de navegação novo ("Favoritos", `IconeEstrela`) entre "Apuração" e "Novo boletim" — público, sem exigir login, igual ao painel geral.
 - **Confirmado com Playwright**, boletim de teste com números que colocam de propósito um candidato "destaque" atrás em votos (ex.: Raquel Lyra com 10 votos, João Campos com 15): o destaque aparece primeiro mesmo assim, em todos os cargos testados. Conferido em 390px (celular) e 1280px (desktop).
 
+## Bug real e sutil: inputs invadindo uns aos outros dentro de `<details>`
+
+A responsável pelo projeto reportou, com print, os campos "Candidato"/"Votos"/"Remover" (da digitação manual) se sobrepondo — tanto no desktop quanto no celular. A causa era bem mais funda do que parecia e vale registrar, porque pode voltar a aparecer em qualquer `<details>` do site.
+
+- O projeto usa o reset clássico `*, *::before, *::after { box-sizing: inherit }` (com `border-box` no `:root`) pra todo input com `width: 100%` não estourar o padding/borda pra fora da coluna.
+- **O que faltava:** navegadores Chrome recentes renderizam o conteúdo de um `<details>` aberto (tudo exceto o `<summary>`) dentro de um pseudo-elemento interno, `::details-content`, que fica *entre* o `<details>` e os filhos de verdade pra efeito de herança de propriedade CSS. Esse pseudo-elemento **não é coberto** por `*::before`/`*::after` — ele some do reset. Sem herdar `border-box`, `::details-content` fica no valor inicial (`content-box`), e **todo filho dentro do `<details>` aberto herda `content-box` dele**, não do `<details>` (que continha `border-box` certinho). Resultado: qualquer input com padding + `width: 100%` ali dentro passa da largura da sua coluna exatamente pela soma do padding com a borda (~30px, no caso) — invisível em colunas largas, mas sobrepõe o vizinho em colunas estreitas como a de "Votos" (150px).
+- **Como achei:** reproduzi a tela exata do print com Playwright (mesma largura, tema escuro) e consultei `getComputedStyle` subindo a árvore do input até o `<html>`; a herança quebrava exatamente no primeiro `<div>` dentro do `<details>`. Testei `getComputedStyle(details, '::details-content')` e confirmou: `box-sizing: content-box`, sozinho, diferente de todo o resto da árvore.
+- **Correção:** acrescentar `*::details-content` na mesma regra de reset, em `app/globals.css`. Uma linha, resolve em qualquer `<details>` do site (digitação, conferência, boletins do admin), não só onde foi reportado.
+- **Confirmado:** `getBoundingClientRect()` de cada campo batendo exatamente com a largura da sua coluna (sem sobra), nas mesmas resolução e tema do print original, e visualmente também na conferência e no celular. Suíte completa 164/164, `next build` limpo.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
