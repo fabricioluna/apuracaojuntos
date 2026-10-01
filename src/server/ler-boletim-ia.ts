@@ -6,7 +6,9 @@ import type { CargoId } from '../bu/types';
 
 export class ErroLeituraIA extends Error {}
 
-const MODELO = 'gemini-2.5-flash';
+// "-latest" é um apelido que o Google aponta sozinho pro modelo flash atual — evita que o nome
+// fique obsoleto e comece a dar 404 (já aconteceu uma vez com um nome fixo, ao testar).
+const MODELO = 'gemini-flash-latest';
 const URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const PROMPT = `Você está lendo a foto de um Boletim de Urna (BU) oficial do TSE (Brasil) — o relatório impresso pela urna eletrônica ao final da votação numa seção eleitoral.
