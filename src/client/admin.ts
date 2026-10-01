@@ -28,5 +28,7 @@ export const cadastrarFiscal = (nome: string, admin: boolean) =>
 export const definirFiscalAtivo = (id: string, ativo: boolean) =>
   chamarApi<{ ok: true }>(`/api/admin/fiscais/${id}`, { method: 'PATCH', body: JSON.stringify({ ativo }) });
 
+export const excluirFiscal = (id: string) => chamarApi<{ ok: true }>(`/api/admin/fiscais/${id}`, { method: 'DELETE' });
+
 export const atualizarConfig = (mudanca: { zonas?: ZonaConfig[]; turno?: 1 | 2 }) =>
   chamarApi<{ config: ConfigCidade }>('/api/admin/config', { method: 'PATCH', body: JSON.stringify(mudanca) });

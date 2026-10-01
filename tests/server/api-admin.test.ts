@@ -3,7 +3,7 @@ import { GET as GET_boletim } from '../../app/api/admin/boletins/[id]/route';
 import { GET as GET_boletins } from '../../app/api/admin/boletins/route';
 import { PATCH as PATCH_config } from '../../app/api/admin/config/route';
 import { GET as GET_divergencias } from '../../app/api/admin/divergencias/route';
-import { PATCH as PATCH_fiscal } from '../../app/api/admin/fiscais/[id]/route';
+import { DELETE as DELETE_fiscal, PATCH as PATCH_fiscal } from '../../app/api/admin/fiscais/[id]/route';
 import { GET as GET_fiscais, POST as POST_fiscal } from '../../app/api/admin/fiscais/route';
 import { decodificarBU } from '../../src/bu';
 import { CARGOS_ORDEM } from '../../src/bu/cargos';
@@ -133,6 +133,31 @@ describe('fiscais: GET/POST/PATCH', () => {
     const { idToken } = await loginComoFiscal('Administradora', { admin: true });
     const r = await POST_fiscal(req('http://local/api/admin/fiscais', idToken, { method: 'POST', body: JSON.stringify({ nome: 'Zé' }) }));
     expect(r.status).toBe(400);
+  });
+
+  it('admin exclui um fiscal de vez', async () => {
+    const { idToken } = await loginComoFiscal('Administradora', { admin: true });
+    const { uid } = await loginComoFiscal('Fiscal Pra Excluir');
+
+    const r = await DELETE_fiscal(req(`http://local/api/admin/fiscais/${uid}`, idToken, { method: 'DELETE' }), { params: Promise.resolve({ id: uid }) });
+    expect(r.status).toBe(200);
+    const doc = await db().collection('fiscais').doc(uid).get();
+    expect(doc.exists).toBe(false);
+  });
+
+  it('admin não consegue excluir o próprio cadastro', async () => {
+    const { idToken, uid } = await loginComoFiscal('Administradora', { admin: true });
+    const r = await DELETE_fiscal(req(`http://local/api/admin/fiscais/${uid}`, idToken, { method: 'DELETE' }), { params: Promise.resolve({ id: uid }) });
+    expect(r.status).toBe(400);
+    const doc = await db().collection('fiscais').doc(uid).get();
+    expect(doc.exists).toBe(true);
+  });
+
+  it('fiscal comum não consegue excluir ninguém', async () => {
+    const { idToken } = await loginComoFiscal('Fiscal Comum');
+    const { uid } = await loginComoFiscal('Outro Fiscal');
+    const r = await DELETE_fiscal(req(`http://local/api/admin/fiscais/${uid}`, idToken, { method: 'DELETE' }), { params: Promise.resolve({ id: uid }) });
+    expect(r.status).toBe(403);
   });
 });
 

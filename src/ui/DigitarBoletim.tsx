@@ -4,6 +4,10 @@
 // data/candidatos.json; continua dando pra digitar um número que não está lá (candidato trocado
 // depois da planilha, por exemplo — vira "Candidato NNNN" na conferência). Ver nota em
 // src/domain/validar-digitado.ts sobre por que não existe digitação de um cargo isolado.
+//
+// O total não é digitado: é sempre a soma de candidatos + legenda + brancos + nulos, calculada
+// sozinha (decisão da responsável pelo projeto). Campo deixado em branco conta como zero, mas fica
+// sinalizado (borda tracejada + aviso) pra não passar despercebido — ver `camposEmBranco` abaixo.
 import { useMemo, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO, TIPO_CARGO } from '../bu/cargos';
 import type { CargoId } from '../bu/types';
@@ -27,14 +31,14 @@ interface EstadoCargo {
   legenda: LinhaNumero[];
   branco: string;
   nulo: string;
-  total: string;
 }
 
 const linhaVazia = (): LinhaNumero => ({ chave: crypto.randomUUID(), numero: '', votos: '' });
-const cargoVazio = (): EstadoCargo => ({ candidatos: [linhaVazia()], legenda: [], branco: '', nulo: '', total: '' });
+const cargoVazio = (): EstadoCargo => ({ candidatos: [linhaVazia()], legenda: [], branco: '', nulo: '' });
 
+/** Texto em branco conta como zero (sinalizado na interface, não bloqueia). */
 function paraNumero(txt: string): number {
-  return txt.trim() === '' ? NaN : Number(txt);
+  return txt.trim() === '' ? 0 : Number(txt);
 }
 
 /** Converte o estado do formulário para o formato que validarCargosDigitados espera. */
@@ -43,7 +47,7 @@ function paraCargoDigitado(e: EstadoCargo): CargoDigitado {
   for (const l of e.candidatos) if (l.numero.trim()) votos[l.numero.trim()] = paraNumero(l.votos);
   const legenda: Record<string, number> = {};
   for (const l of e.legenda) if (l.numero.trim()) legenda[l.numero.trim()] = paraNumero(l.votos);
-  return { votos, legenda, branco: paraNumero(e.branco), nulo: paraNumero(e.nulo), total: paraNumero(e.total) };
+  return { votos, legenda, branco: paraNumero(e.branco), nulo: paraNumero(e.nulo) };
 }
 
 export function DigitarBoletim({
@@ -120,11 +124,16 @@ function CargoDigitavel({
   const proporcional = TIPO_CARGO[cargoId] === 'proporcional';
   const listaCandidatos = useMemo(() => candidatosDoCargo(CANDIDATOS, cargoId), [cargoId]);
   const listaPartidos = useMemo(() => partidosDoCargo(CANDIDATOS, cargoId), [cargoId]);
-  const somaCandidatos = estado.candidatos.reduce((a, l) => a + (paraNumero(l.votos) || 0), 0);
-  const somaLegenda = estado.legenda.reduce((a, l) => a + (paraNumero(l.votos) || 0), 0);
-  const total = paraNumero(estado.total);
-  const somaTudo = somaCandidatos + somaLegenda + (paraNumero(estado.branco) || 0) + (paraNumero(estado.nulo) || 0);
-  const bateu = !Number.isNaN(total) && somaTudo === total;
+  const somaCandidatos = estado.candidatos.reduce((a, l) => a + paraNumero(l.votos), 0);
+  const somaLegenda = estado.legenda.reduce((a, l) => a + paraNumero(l.votos), 0);
+  const somaTudo = somaCandidatos + somaLegenda + paraNumero(estado.branco) + paraNumero(estado.nulo);
+
+  // Campo com número escolhido mas votos em branco (ou brancos/nulos em branco): conta como zero,
+  // mas sinalizamos pra não passar despercebido — ver aviso logo abaixo das entradas.
+  const emBranco = [
+    ...estado.candidatos.filter(l => l.numero.trim() && l.votos.trim() === ''),
+    ...estado.legenda.filter(l => l.numero.trim() && l.votos.trim() === ''),
+  ].length + (estado.branco.trim() === '' ? 1 : 0) + (estado.nulo.trim() === '' ? 1 : 0);
 
   function mudarNumero(lista: 'candidatos' | 'legenda', chave: string, numero: string) {
     onMudar({ [lista]: estado[lista].map(l => (l.chave === chave ? { ...l, numero } : l)) });
@@ -143,7 +152,7 @@ function CargoDigitavel({
     <details className="cargo-conf cargo-digitavel" open={aberto} onToggle={e => e.currentTarget.open !== aberto && onAlternar()}>
       <summary>
         {NOME_CARGO[cargoId]}
-        <span>{bateu ? `${somaTudo} votos` : 'confira a soma'}</span>
+        <span>{somaTudo} votos</span>
       </summary>
       <div className="pilha" style={{ marginTop: 12 }}>
         <strong>Candidatos com voto</strong>
@@ -153,7 +162,14 @@ function CargoDigitavel({
             <div className="votos-remover">
               <div className="campo">
                 <label htmlFor={`vot-${l.chave}`}>Votos</label>
-                <input id={`vot-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarVotos('candidatos', l.chave, e.target.value)} />
+                <input
+                  id={`vot-${l.chave}`}
+                  className="campo-numero"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={l.votos}
+                  onChange={e => mudarVotos('candidatos', l.chave, e.target.value)}
+                />
               </div>
               <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('candidatos', l.chave)} aria-label="Remover candidato">
                 Remover
@@ -175,7 +191,14 @@ function CargoDigitavel({
                 <div className="votos-remover">
                   <div className="campo">
                     <label htmlFor={`vleg-${l.chave}`}>Votos de legenda</label>
-                    <input id={`vleg-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarVotos('legenda', l.chave, e.target.value)} />
+                    <input
+                      id={`vleg-${l.chave}`}
+                      className="campo-numero"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={l.votos}
+                      onChange={e => mudarVotos('legenda', l.chave, e.target.value)}
+                    />
                   </div>
                   <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('legenda', l.chave)} aria-label="Remover partido">
                     Remover
@@ -193,22 +216,21 @@ function CargoDigitavel({
         <div className="entradas">
           <div className="campo">
             <label htmlFor={`branco-${cargoId}`}>Brancos</label>
-            <input id={`branco-${cargoId}`} inputMode="numeric" value={estado.branco} onChange={e => onMudar({ branco: e.target.value })} />
+            <input id={`branco-${cargoId}`} className="campo-numero" inputMode="numeric" placeholder="0" value={estado.branco} onChange={e => onMudar({ branco: e.target.value })} />
           </div>
           <div className="campo">
             <label htmlFor={`nulo-${cargoId}`}>Nulos</label>
-            <input id={`nulo-${cargoId}`} inputMode="numeric" value={estado.nulo} onChange={e => onMudar({ nulo: e.target.value })} />
-          </div>
-          <div className="campo">
-            <label htmlFor={`total-${cargoId}`}>
-              <strong>Total apurado no boletim</strong>
-            </label>
-            <input id={`total-${cargoId}`} inputMode="numeric" value={estado.total} onChange={e => onMudar({ total: e.target.value })} />
+            <input id={`nulo-${cargoId}`} className="campo-numero" inputMode="numeric" placeholder="0" value={estado.nulo} onChange={e => onMudar({ nulo: e.target.value })} />
           </div>
         </div>
-        <p className={`msg soma-info ${Number.isNaN(total) ? 'aviso' : bateu ? 'ok' : 'erro'}`} role="status">
-          {Number.isNaN(total) ? `Soma até agora: ${somaTudo}. Informe o total impresso no boletim.` : bateu ? `Soma ${somaTudo}, igual ao total.` : `Soma ${somaTudo}, total informado ${total}. Os números precisam bater.`}
+        <p className="msg soma-info ok" role="status">
+          Total: {somaTudo} votos (candidatos + legenda + brancos + nulos, somado sozinho).
         </p>
+        {emBranco > 0 && (
+          <p className="msg aviso" role="status">
+            {emBranco} campo{emBranco > 1 ? 's' : ''} em branco, contado{emBranco > 1 ? 's' : ''} como zero — confira se não esqueceu de preencher algum (marcados com borda tracejada).
+          </p>
+        )}
       </div>
     </details>
   );

@@ -3,8 +3,10 @@ import type { CargoId } from '../bu/types';
 import type { CargoEntrada } from './types';
 
 /**
- * O que o fiscal digita para um cargo, olhando o papel. Mesmas regras de soma do decodificador
- * (candidatos + legenda + brancos + nulos = total).
+ * O que o fiscal digita para um cargo, olhando o papel. O total não é digitado: é sempre a soma de
+ * candidatos + legenda + brancos + nulos (decisão da responsável pelo projeto — menos um campo pra
+ * preencher e pra bater errado). Campo em branco conta como zero (sinalizado na interface, não
+ * aqui — ver src/ui/DigitarBoletim.tsx); só valor negativo ou fracionado é recusado.
  *
  * Importante: no boletim real, os QR Codes não são um por cargo (são pedaços de texto em sequência).
  * Se um QR Code está ilegível, normalmente não dá para aproveitar parte da leitura: o fiscal digita
@@ -15,7 +17,6 @@ export interface CargoDigitado {
   legenda?: Record<string, number>;
   branco: number;
   nulo: number;
-  total: number;
 }
 
 const soma = (r: Record<string, number> | undefined) => Object.values(r ?? {}).reduce((a, b) => a + b, 0);
@@ -34,16 +35,13 @@ export function validarCargosDigitados(
       mensagens.push(`${NOME_CARGO[id]} não tem votos de legenda.`);
       continue;
     }
-    const valores = [...Object.values(d.votos), ...Object.values(d.legenda ?? {}), d.branco, d.nulo, d.total];
-    if (valores.length === 0 || valores.some(v => !Number.isInteger(v) || v < 0)) {
-      mensagens.push(`${NOME_CARGO[id]}: há valores vazios, negativos ou fracionados.`);
+    const valores = [...Object.values(d.votos), ...Object.values(d.legenda ?? {}), d.branco, d.nulo];
+    if (valores.some(v => !Number.isInteger(v) || v < 0)) {
+      mensagens.push(`${NOME_CARGO[id]}: há valores negativos ou fracionados.`);
       continue;
     }
-    const somaVotos = soma(d.votos), somaLegenda = soma(d.legenda);
-    if (somaVotos + somaLegenda + d.branco + d.nulo !== d.total) {
-      mensagens.push(`${NOME_CARGO[id]}: a soma dos votos (${somaVotos + somaLegenda + d.branco + d.nulo}) não bate com o total digitado (${d.total}).`);
-      continue;
-    }
+    const somaVotos = soma(d.votos);
+    const somaLegenda = soma(d.legenda);
     cargos[id] = {
       codigo: CARGO_CODIGO[id],
       id,
@@ -52,7 +50,7 @@ export function validarCargosDigitados(
       legenda: d.legenda ?? {},
       branco: d.branco,
       nulo: d.nulo,
-      total: d.total,
+      total: somaVotos + somaLegenda + d.branco + d.nulo,
       nominais: somaVotos,
       legendaTotal: somaLegenda,
       aptos: 0,

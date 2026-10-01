@@ -48,6 +48,6 @@ export const ACOMPANHADOS: Partial<Record<CargoId, CandidatoAcompanhado[]>> = {
     { numero: '20120', partido: 'Solidariedade', destaque: true }, // Luciano Duque
     { numero: '20123', partido: 'Podemos', destaque: false }, // Regina da Saúde
     { numero: '40123', partido: 'PSB', destaque: false }, // Rodrigo Farias
-    { numero: '40555', partido: 'PSB', destaque: true }, // Romerinho Jatobá
+    { numero: '40555', partido: 'PSB', destaque: false }, // Romerinho Jatobá
   ],
 };

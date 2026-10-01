@@ -1,15 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { cadastrarFiscal, definirFiscalAtivo, listarFiscais } from '../../client/admin';
+import { cadastrarFiscal, definirFiscalAtivo, excluirFiscal, listarFiscais } from '../../client/admin';
+import { usarSessao } from '../../client/usarSessao';
 import type { FiscalResumo } from '../../server/admin/fiscais';
 
 export function FiscaisTab() {
+  const { sessao } = usarSessao();
   const [fiscais, setFiscais] = useState<FiscalResumo[] | null>(null);
   const [erro, setErro] = useState('');
   const [nome, setNome] = useState('');
   const [ehAdmin, setEhAdmin] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [novoCodigo, setNovoCodigo] = useState<{ nome: string; codigo: string } | null>(null);
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<string | null>(null);
 
   function carregar() {
     listarFiscais()
@@ -41,6 +45,20 @@ export function FiscaisTab() {
       carregar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível atualizar.');
+    }
+  }
+
+  async function confirmarExclusao(f: FiscalResumo) {
+    setExcluindo(f.id);
+    setErro('');
+    try {
+      await excluirFiscal(f.id);
+      setConfirmando(null);
+      carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível excluir.');
+    } finally {
+      setExcluindo(null);
     }
   }
 
@@ -77,6 +95,10 @@ export function FiscaisTab() {
 
       <section className="painel">
         <h3>Fiscais cadastrados</h3>
+        <p className="lead">
+          "Desativar" é reversível (a pessoa só não consegue mais entrar, mas o cadastro fica guardado). "Excluir" apaga o cadastro de vez — não dá pra desfazer. Boletins já enviados não são
+          afetados, nos dois casos.
+        </p>
         {!fiscais ? (
           <p className="lead">Carregando…</p>
         ) : (
@@ -97,9 +119,35 @@ export function FiscaisTab() {
                     <td>{f.admin ? 'Administrador' : 'Fiscal'}</td>
                     <td>{f.ativo ? <span className="etiqueta certo">Ativo</span> : <span className="etiqueta alerta">Desativado</span>}</td>
                     <td>
-                      <button className="btn ghost pequeno" onClick={() => alternarAtivo(f)}>
-                        {f.ativo ? 'Desativar' : 'Reativar'}
-                      </button>
+                      <div className="linha-botoes" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+                        <button className="btn ghost pequeno" onClick={() => alternarAtivo(f)}>
+                          {f.ativo ? 'Desativar' : 'Reativar'}
+                        </button>
+                        {confirmando === f.id ? (
+                          <>
+                            <button
+                              className="btn ghost pequeno"
+                              disabled={excluindo === f.id}
+                              onClick={() => confirmarExclusao(f)}
+                              style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }}
+                            >
+                              {excluindo === f.id ? 'Excluindo…' : 'Confirmar exclusão'}
+                            </button>
+                            <button className="btn ghost pequeno" disabled={excluindo === f.id} onClick={() => setConfirmando(null)}>
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="btn ghost pequeno"
+                            disabled={f.id === sessao?.uid}
+                            title={f.id === sessao?.uid ? 'Você não pode excluir seu próprio cadastro.' : undefined}
+                            onClick={() => setConfirmando(f.id)}
+                          >
+                            Excluir
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

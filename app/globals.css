@@ -389,6 +389,14 @@ main {
 .campo select:disabled {
   opacity: 0.6;
 }
+/* Campo de voto/branco/nulo deixado em branco: conta como zero (ver DigitarBoletim.tsx), mas fica
+   com uma pista visual pra não passar despercebido. :placeholder-shown já cobre "só aparece
+   enquanto o campo está vazio" sozinho, sem precisar de JS. */
+.campo-numero:placeholder-shown {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn-bg) 35%, var(--panel));
+}
 .campo small {
   color: var(--muted);
 }

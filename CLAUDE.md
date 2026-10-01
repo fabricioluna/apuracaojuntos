@@ -270,6 +270,17 @@ A pedido da responsável pelo projeto: Pesqueira só tem a zona 55 (ver CLAUDE.m
 - `app/novo/page.tsx`: quando `config.zonas` tem só uma zona, ela é preenchida sozinha (`useEffect`) e o `<select>` de zona nem aparece — só sobra a escolha da seção. Se um dia uma cidade tiver mais de uma zona, o seletor volta a aparecer sozinho (`config.zonas.length > 1`), sem precisar mexer em nada.
 - Trocar de zona (nas cidades que tiverem mais de uma) agora limpa a seção escolhida, pra nunca ficar com uma seção de uma zona errada selecionada por engano.
 
+## Exclusão de fiscal, total automático na digitação, Favoritos
+
+Quatro pedidos da responsável pelo projeto, numa só rodada:
+
+- **Admin pode excluir um fiscal de vez** (`src/ui/admin/Fiscais.tsx`, botão "Excluir" com confirmação em duas etapas — clica, vira "Confirmar exclusão"/"Cancelar"). Diferente de "Desativar" (reversível, só impede login): exclusão apaga o cadastro do Firestore **e** o usuário correspondente no Firebase Auth (`src/server/admin/fiscais.ts`, `excluirFiscal`) — não dá pra desfazer. Boletins já enviados não são afetados (guardam `fiscalNome` como texto solto, não uma referência viva ao cadastro). **Ninguém pode excluir o próprio cadastro** (conferido no servidor, `app/api/admin/fiscais/[id]/route.ts`, e o botão já vem desabilitado na interface pra quem está logado) — evita se trancar fora sem querer.
+- **O total de cada cargo, na digitação manual, não é mais digitado — é sempre a soma calculada sozinha** (candidatos + legenda + brancos + nulos). Tirei o campo "Total apurado no boletim" de `src/ui/DigitarBoletim.tsx`; o resumo de cada cargo mostra a soma direto. `src/domain/validar-digitado.ts` (`CargoDigitado`) perdeu o campo `total` — quem calcula agora é a própria função, não dá mais pra "não bater" contra nada.
+  - **Campo deixado em branco conta como zero, mas fica sinalizado** — bordas tracejadas na cor de aviso nos campos vazios (`.campo-numero:placeholder-shown`, puro CSS, sem JS) e um aviso agregado por cargo ("N campos em branco, contados como zero"). Não bloqueia mais o "Conferir e continuar" (antes, qualquer campo vazio travava com "há valores vazios, negativos ou fracionados"); só valor negativo ou fracionado continua sendo recusado.
+  - Essa mudança é só na digitação manual. A leitura por QR Code continua exigindo e conferindo o `TOTC` de verdade, impresso/codificado no boletim oficial (ver "Fatos verificados sobre o BU") — ali não tem o que "deixar em branco", o valor vem pronto do QR Code.
+- **Romerinho Jatobá saiu dos destaques** em `src/domain/acompanhados.ts` (`destaque: false`) — continua na lista de Deputado Estadual, só não aparece mais em primeiro nem com o cartão maior.
+- Suíte completa 167/167 (3 testes novos pra exclusão de fiscal, incluindo a recusa de autoexclusão). Confirmado com Playwright: fiscal excluído some da lista (conferido direto no Firestore), botão de autoexclusão desabilitado, digitação com campos em branco mostra o aviso e deixa continuar, Favoritos sem o selo no Romerinho.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

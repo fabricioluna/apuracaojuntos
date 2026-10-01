@@ -1,4 +1,4 @@
-import { db } from '../firebase-admin';
+import { auth, db } from '../firebase-admin';
 import { gerarCodigo, hashCodigo } from '../fiscal-auth';
 
 export interface FiscalResumo {
@@ -31,4 +31,17 @@ export async function cadastrarFiscal(nome: string, admin: boolean, criadoPor: s
 
 export async function definirAtivo(id: string, ativo: boolean): Promise<void> {
   await db().collection('fiscais').doc(id).update({ ativo });
+}
+
+/**
+ * Exclui o cadastro de verdade (diferente de desativar: não dá pra desfazer). Também apaga o
+ * usuário correspondente no Firebase Auth, se já tiver feito login alguma vez (se nunca logou, o
+ * usuário nem existe lá, daí o catch). Boletins já enviados não são afetados — guardam o nome do
+ * fiscal como texto solto (fiscalNome), não uma referência viva a este cadastro.
+ */
+export async function excluirFiscal(id: string): Promise<void> {
+  await db().collection('fiscais').doc(id).delete();
+  await auth()
+    .deleteUser(id)
+    .catch(() => {});
 }
