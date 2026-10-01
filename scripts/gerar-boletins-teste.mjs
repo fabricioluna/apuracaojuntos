@@ -178,9 +178,13 @@ ${cargos.map(({ cargo, resumo }) => blocoCargo(cargo, resumo)).join('\n')}`;
 <html lang="pt-BR"><head><meta charset="utf-8"><style>
   body { background:#fff; margin:0; padding:32px; font-family: 'Courier New', monospace; font-size:14px; color:#111; white-space:pre; }
   .selo { background:#ffe0e8; color:#b00035; display:inline-block; padding:4px 10px; border-radius:6px; font-weight:bold; margin-bottom:12px; white-space:normal; }
-  .qrs { display:flex; gap:16px; margin-top:24px; white-space:normal; }
+  .qrs { display:flex; flex-wrap:wrap; gap:16px; margin-top:24px; white-space:normal; }
   .qrs figure { margin:0; text-align:center; font-size:12px; }
-  .qrs img { width:200px; height:200px; image-rendering:pixelated; }
+  /* Tamanho nativo (500x500, igual ao gerado), de propósito — sem CSS width/height pra
+     redimensionar. Deixar o navegador reamostrar a imagem (mesmo com "pixelated") borra os módulos
+     de QR Codes mais densos (boletins com mais candidatos) o bastante pra ficarem ilegíveis depois
+     de printar a tela. Veja CLAUDE.md > "Gerador de boletins de teste". */
+  .qrs img { image-rendering:pixelated; }
 </style></head>
 <body>
 <div class="selo">⚠ BOLETIM SIMULADO — gerado só pra teste, não é uma urna real (FASE:S)</div>
@@ -217,7 +221,10 @@ async function gerarUrna(secaoInfo, zona, pastaBase, numPartesQR) {
   for (let i = 0; i < textosQR.length; i++) {
     const arquivo = path.join(pasta, `qr-${i + 1}-de-${textosQR.length}.png`);
     await QRCode.toFile(arquivo, textosQR[i], { errorCorrectionLevel: 'M', margin: 2, width: 500 });
-    qrDataUrls.push(await QRCode.toDataURL(textosQR[i], { errorCorrectionLevel: 'M', margin: 2, width: 260 }));
+    // Precisa ser denso o bastante pra continuar escaneável depois de printar a tela ou fotografar
+    // (um QR Code com muito conteúdo — proporcionais com vários candidatos — já nasce com mais
+    // módulos; exibido pequeno demais, cada módulo vira menos de um pixel na captura e some).
+    qrDataUrls.push(await QRCode.toDataURL(textosQR[i], { errorCorrectionLevel: 'M', margin: 2, width: 500 }));
   }
 
   const html = gerarRelatorioHtml({
