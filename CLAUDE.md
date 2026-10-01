@@ -293,6 +293,19 @@ Três pedidos da responsável pelo projeto, todos sobre a aba Ajustes/Boletins d
   - Export é um `GET` autenticado (o botão faz `fetch` com o token e monta o download via Blob — não dá pra só abrir o link direto, porque a rota exige o cabeçalho `Authorization`). Import é um `POST` com `{ csv: <texto do arquivo> }`.
 - Suíte completa 179/179 (12 testes novos: excluir boletim — inclusive apagando a divergência ligada —, zerar apuração, e a ida-e-volta completa exportar → zerar → importar, conferindo que os totais batem exatamente igual a antes). Confirmado com Playwright contra `next dev` + emuladores: fluxo real de ponta a ponta (envia 2 boletins → exclui um pela interface → exporta CSV → zera → importa o mesmo CSV de volta → a lista de Boletins mostra exatamente o que tinha sido exportado).
 
+## "Foto do boletim" aceita galeria/arquivo, não só a câmera
+
+`app/novo/page.tsx`: o `<input type="file">` do botão "Foto do boletim" tinha `capture="environment"` — no Android isso abre a câmera direto, sem dar a opção de escolher uma foto já tirada (galeria) ou um arquivo. Tirado o atributo: agora abre a escolha nativa do celular (câmera, galeria ou arquivos), a pedido da responsável pelo projeto. Resto do fluxo não muda (ainda tenta decodificar um QR Code da imagem escolhida, igual antes).
+
+## Leitura da foto por IA: ainda não — ponto em aberto, não uma etapa feita
+
+A responsável pelo projeto perguntou se dá pra usar IA (tipo Gemini) ou OCR tradicional pra ler os números impressos na foto do boletim, em vez de só tentar achar um QR Code nela. Isso está deliberadamente fora do escopo desde o pedido original ("Deixe para o fim: leitura de foto por IA") — não implementei nada ainda, só documentando a análise pra quando for decidido avançar:
+
+- **OCR tradicional (Tesseract etc.) não é a aposta certa aqui.** Funciona bem em documento escaneado, iluminação uniforme, sem inclinação. A foto de um fiscal, no celular, num local de votação, tem exatamente o oposto disso — sombra, ângulo, vinco no papel, foco. OCR tradicional também não entende *estrutura* (qual número é voto de qual candidato): precisaria de um passo extra de reconhecer o layout e recortar colunas, o que é ainda mais frágil contra variação de foto.
+- **Um modelo multimodal (Gemini, Claude, GPT-4V) é mais robusto pra foto do mundo real**, porque não depende de segmentar caractere por caractere — entende o contexto ("isto é um boletim de urna, me devolva {cargo, número, votos} de cada linha") e dá pra pedir a saída já em JSON no formato que o app usa. Não é à toa que é o caminho mais comum hoje pra "ler um documento fotografado de qualquer jeito".
+- **Mas não é infalível — e aqui o erro custa caro (um voto a mais ou a menos).** Por isso, se isso for implementado, a leitura por IA **nunca deve gravar direto**: o resultado deve só pré-preencher a tela de "Digitar os valores" que já existe, pro fiscal conferir contra o papel e corrigir antes de confirmar — exatamente como um autocompletar, nunca pulando a conferência humana. Isso é consistente com o resto do app (nenhum dado entra sem alguém confirmar).
+- **Decisões que faltam, antes de construir:** qual provedor (Gemini exige conta/chave do Google Cloud; a Anthropic também tem visão em seus modelos, o que evitaria precisar de uma segunda conta só pra isso); o custo é pequeno de qualquer jeito (no máximo ~181 fotos, uma por seção); e a chave da API, como qualquer segredo do projeto, fica só em variável de ambiente no servidor — o cliente nunca manda a foto direto pro provedor de IA, só pro nosso próprio servidor, que repassa.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

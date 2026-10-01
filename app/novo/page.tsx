@@ -210,7 +210,9 @@ export default function PaginaNovoBoletim() {
                 <button className="btn ghost" onClick={() => setVista('digitar-urna')}>
                   <IconeTeclado /> Digitar os valores
                 </button>
-                <input ref={arquivoRef} type="file" accept="image/*" capture="environment" hidden onChange={e => aoEscolherFoto(e.target.files?.[0])} />
+                {/* Sem "capture": no celular, isso abre a escolha entre câmera, galeria e arquivos — com
+                    "capture=environment" o Android abre a câmera direto, sem dar a opção de galeria. */}
+                <input ref={arquivoRef} type="file" accept="image/*" hidden onChange={e => aoEscolherFoto(e.target.files?.[0])} />
               </div>
               <div className={`leitor-caixa ${escaneando ? '' : 'oculto'}`}>
                 <div id="leitor" />
