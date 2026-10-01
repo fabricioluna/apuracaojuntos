@@ -1,13 +1,20 @@
 'use client';
-// Digitação da urna inteira, olhando o papel. Sem lista fixa de candidatos: o fiscal digita o
-// número de cada candidato (ou partido, nos proporcionais) e os votos. Ver nota em
+// Digitação da urna inteira, olhando o papel. Sem lista FECHADA de candidatos: o seletor por nome
+// (SeletorCandidato) é só uma ajuda pra digitar mais rápido e sem erro de número, usando
+// data/candidatos.json; continua dando pra digitar um número que não está lá (candidato trocado
+// depois da planilha, por exemplo — vira "Candidato NNNN" na conferência). Ver nota em
 // src/domain/validar-digitado.ts sobre por que não existe digitação de um cargo isolado.
 import { useMemo, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO, TIPO_CARGO } from '../bu/cargos';
 import type { CargoId } from '../bu/types';
+import { candidatosDoCargo, partidosDoCargo, type ListaCandidatos } from '../domain/candidatos';
 import type { CargoDigitado } from '../domain/validar-digitado';
 import { validarCargosDigitados } from '../domain/validar-digitado';
 import type { CargoEntrada } from '../domain/types';
+import { SeletorCandidato } from './SeletorCandidato';
+import candidatosJson from '../../data/candidatos.json';
+
+const CANDIDATOS = candidatosJson as ListaCandidatos;
 
 interface LinhaNumero {
   chave: string;
@@ -51,6 +58,8 @@ export function DigitarBoletim({
     for (const id of exigidos) s[id] = cargoVazio();
     return s;
   });
+  // Só o primeiro cargo começa aberto — evita uma rolagem gigante com tudo expandido de uma vez.
+  const [aberto, setAberto] = useState<CargoId | null>(exigidos[0] ?? null);
 
   const resultado = useMemo(() => {
     const digitado: Partial<Record<CargoId, CargoDigitado>> = {};
@@ -69,7 +78,14 @@ export function DigitarBoletim({
   return (
     <div className="pilha">
       {exigidos.map(id => (
-        <CargoDigitavel key={id} cargoId={id} estado={estado[id]!} onMudar={m => atualizarCargo(id, m)} />
+        <CargoDigitavel
+          key={id}
+          cargoId={id}
+          estado={estado[id]!}
+          aberto={aberto === id}
+          onAlternar={() => setAberto(a => (a === id ? null : id))}
+          onMudar={m => atualizarCargo(id, m)}
+        />
       ))}
       <p className="msg" role="status" style={resultado.ok ? undefined : { display: 'none' }}>
         Os {exigidos.length} cargos estão certos. Pode continuar.
@@ -88,16 +104,33 @@ export function DigitarBoletim({
   );
 }
 
-function CargoDigitavel({ cargoId, estado, onMudar }: { cargoId: CargoId; estado: EstadoCargo; onMudar: (m: Partial<EstadoCargo>) => void }) {
+function CargoDigitavel({
+  cargoId,
+  estado,
+  aberto,
+  onAlternar,
+  onMudar,
+}: {
+  cargoId: CargoId;
+  estado: EstadoCargo;
+  aberto: boolean;
+  onAlternar: () => void;
+  onMudar: (m: Partial<EstadoCargo>) => void;
+}) {
   const proporcional = TIPO_CARGO[cargoId] === 'proporcional';
+  const listaCandidatos = useMemo(() => candidatosDoCargo(CANDIDATOS, cargoId), [cargoId]);
+  const listaPartidos = useMemo(() => partidosDoCargo(CANDIDATOS, cargoId), [cargoId]);
   const somaCandidatos = estado.candidatos.reduce((a, l) => a + (paraNumero(l.votos) || 0), 0);
   const somaLegenda = estado.legenda.reduce((a, l) => a + (paraNumero(l.votos) || 0), 0);
   const total = paraNumero(estado.total);
   const somaTudo = somaCandidatos + somaLegenda + (paraNumero(estado.branco) || 0) + (paraNumero(estado.nulo) || 0);
   const bateu = !Number.isNaN(total) && somaTudo === total;
 
-  function mudarLinha(lista: 'candidatos' | 'legenda', chave: string, campo: 'numero' | 'votos', valor: string) {
-    onMudar({ [lista]: estado[lista].map(l => (l.chave === chave ? { ...l, [campo]: valor } : l)) });
+  function mudarNumero(lista: 'candidatos' | 'legenda', chave: string, numero: string) {
+    onMudar({ [lista]: estado[lista].map(l => (l.chave === chave ? { ...l, numero } : l)) });
+  }
+  function mudarVotos(lista: 'candidatos' | 'legenda', chave: string, votos: string) {
+    onMudar({ [lista]: estado[lista].map(l => (l.chave === chave ? { ...l, votos } : l)) });
   }
   function addLinha(lista: 'candidatos' | 'legenda') {
     onMudar({ [lista]: [...estado[lista], linhaVazia()] });
@@ -107,7 +140,7 @@ function CargoDigitavel({ cargoId, estado, onMudar }: { cargoId: CargoId; estado
   }
 
   return (
-    <details className="cargo-conf" open>
+    <details className="cargo-conf cargo-digitavel" open={aberto} onToggle={e => e.currentTarget.open !== aberto && onAlternar()}>
       <summary>
         {NOME_CARGO[cargoId]}
         <span>{bateu ? `${somaTudo} votos` : 'confira a soma'}</span>
@@ -116,17 +149,16 @@ function CargoDigitavel({ cargoId, estado, onMudar }: { cargoId: CargoId; estado
         <strong>Candidatos com voto</strong>
         {estado.candidatos.map(l => (
           <div className="linha-candidato" key={l.chave}>
-            <div className="campo">
-              <label htmlFor={`num-${l.chave}`}>Número</label>
-              <input id={`num-${l.chave}`} inputMode="numeric" value={l.numero} onChange={e => mudarLinha('candidatos', l.chave, 'numero', e.target.value)} />
+            <SeletorCandidato rotulo="Candidato" lista={listaCandidatos} numero={l.numero} onEscolher={n => mudarNumero('candidatos', l.chave, n)} />
+            <div className="votos-remover">
+              <div className="campo">
+                <label htmlFor={`vot-${l.chave}`}>Votos</label>
+                <input id={`vot-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarVotos('candidatos', l.chave, e.target.value)} />
+              </div>
+              <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('candidatos', l.chave)} aria-label="Remover candidato">
+                Remover
+              </button>
             </div>
-            <div className="campo">
-              <label htmlFor={`vot-${l.chave}`}>Votos</label>
-              <input id={`vot-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarLinha('candidatos', l.chave, 'votos', e.target.value)} />
-            </div>
-            <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('candidatos', l.chave)} aria-label="Remover candidato">
-              Remover
-            </button>
           </div>
         ))}
         <button type="button" className="btn ghost pequeno" onClick={() => addLinha('candidatos')}>
@@ -139,17 +171,16 @@ function CargoDigitavel({ cargoId, estado, onMudar }: { cargoId: CargoId; estado
             <strong>Votos de legenda, por partido</strong>
             {estado.legenda.map(l => (
               <div className="linha-candidato" key={l.chave}>
-                <div className="campo">
-                  <label htmlFor={`part-${l.chave}`}>Número do partido</label>
-                  <input id={`part-${l.chave}`} inputMode="numeric" value={l.numero} onChange={e => mudarLinha('legenda', l.chave, 'numero', e.target.value)} />
+                <SeletorCandidato rotulo="Partido" lista={listaPartidos} numero={l.numero} onEscolher={n => mudarNumero('legenda', l.chave, n)} />
+                <div className="votos-remover">
+                  <div className="campo">
+                    <label htmlFor={`vleg-${l.chave}`}>Votos de legenda</label>
+                    <input id={`vleg-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarVotos('legenda', l.chave, e.target.value)} />
+                  </div>
+                  <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('legenda', l.chave)} aria-label="Remover partido">
+                    Remover
+                  </button>
                 </div>
-                <div className="campo">
-                  <label htmlFor={`vleg-${l.chave}`}>Votos de legenda</label>
-                  <input id={`vleg-${l.chave}`} inputMode="numeric" value={l.votos} onChange={e => mudarLinha('legenda', l.chave, 'votos', e.target.value)} />
-                </div>
-                <button type="button" className="btn ghost pequeno" onClick={() => removerLinha('legenda', l.chave)} aria-label="Remover partido">
-                  Remover
-                </button>
               </div>
             ))}
             <button type="button" className="btn ghost pequeno" onClick={() => addLinha('legenda')}>

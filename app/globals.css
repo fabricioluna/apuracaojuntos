@@ -701,6 +701,12 @@ main {
   display: grid;
   gap: 10px;
 }
+/* #leitor precisa existir no DOM desde o primeiro render — html5-qrcode procura o elemento pelo id
+   na hora que a câmera é aberta, e se a div só aparecer depois (condicionada ao estado "escaneando")
+   a câmera nunca encontra o elemento a tempo. Por isso fica sempre montada e só se esconde por CSS. */
+.leitor-caixa.oculto {
+  display: none;
+}
 #leitor {
   width: 100%;
   min-height: 60px;
@@ -770,16 +776,73 @@ main {
   border-radius: 10px;
   border: 1.5px solid var(--line);
 }
+/* Uma linha de "candidato/partido + votos + remover" na digitação manual. Mobile first: empilha
+   (candidato em cima, votos+remover embaixo) pra nunca sobrepor nada, não importa a largura da
+   tela. Só vira uma única fileira de verdade a partir de 560px, quando sobra espaço de sobra. */
 .linha-candidato {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.votos-remover {
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: end;
 }
-@media (max-width: 480px) {
+@media (min-width: 560px) {
   .linha-candidato {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 150px) auto;
+    align-items: end;
   }
+  .votos-remover {
+    display: contents;
+  }
+}
+/* Seletor de candidato/partido com busca (ver src/ui/SeletorCandidato.tsx) */
+.seletor-candidato {
+  position: relative;
+}
+.sugestoes {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.sugestoes li {
+  margin: 0;
+}
+.sugestoes button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 10px;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  min-height: 44px;
+}
+.sugestoes button .num {
+  font-weight: 700;
+  color: var(--roxo);
+  margin-right: 6px;
+}
+.sugestoes button:hover,
+.sugestoes button.destaque {
+  background: var(--panel-2);
 }
 
 /* ---------- Diálogos ---------- */

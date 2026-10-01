@@ -15,9 +15,13 @@ import { iniciarCamera, lerArquivo, pararCamera } from '../../src/client/leitorQ
 import { chamarApi } from '../../src/client/sessao';
 import { usarFilaOffline } from '../../src/client/usarFilaOffline';
 import { usarSessao } from '../../src/client/usarSessao';
+import { nomeCandidato, nomePartido, type ListaCandidatos } from '../../src/domain/candidatos';
 import type { CargoEntrada } from '../../src/domain/types';
 import { DigitarBoletim } from '../../src/ui/DigitarBoletim';
 import { IconeCheck, IconeFoto, IconeScan, IconeTeclado } from '../../src/ui/icones';
+import candidatosJson from '../../data/candidatos.json';
+
+const CANDIDATOS = candidatosJson as ListaCandidatos;
 
 type Vista = 'leitura' | 'digitar-urna' | 'digitar-cargos' | 'conferencia';
 type OrigemBoletim = { tipo: 'qr'; boletim: BoletimDecodificado } | { tipo: 'digitado'; zona: number; secao: number; turno: 1 | 2; cargos: Partial<Record<CargoId, CargoEntrada>> };
@@ -202,11 +206,9 @@ export default function PaginaNovoBoletim() {
                 </button>
                 <input ref={arquivoRef} type="file" accept="image/*" capture="environment" hidden onChange={e => aoEscolherFoto(e.target.files?.[0])} />
               </div>
-              {escaneando && (
-                <div className="leitor-caixa">
-                  <div id="leitor" />
-                </div>
-              )}
+              <div className={`leitor-caixa ${escaneando ? '' : 'oculto'}`}>
+                <div id="leitor" />
+              </div>
               <div id="leitor-oculto" className="oculto-scan" aria-hidden />
               {mensagem && (
                 <p className={`msg ${mensagem.tipo}`} role="status">
@@ -331,13 +333,17 @@ function Conferencia({
                 <tbody>
                   {Object.entries(c.votos).map(([n, v]) => (
                     <tr key={n}>
-                      <td>Candidato {n}</td>
+                      <td>
+                        {nomeCandidato(CANDIDATOS, id, n)} <span style={{ color: 'var(--muted)' }}>{n}</span>
+                      </td>
                       <td className="n">{v}</td>
                     </tr>
                   ))}
                   {Object.entries(c.legenda).map(([n, v]) => (
                     <tr key={`l${n}`}>
-                      <td>Legenda do partido {n}</td>
+                      <td>
+                        Legenda: {nomePartido(CANDIDATOS, id, n)} <span style={{ color: 'var(--muted)' }}>{n}</span>
+                      </td>
                       <td className="n">{v}</td>
                     </tr>
                   ))}
