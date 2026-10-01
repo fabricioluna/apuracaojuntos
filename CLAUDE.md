@@ -219,6 +219,16 @@ A responsável pelo projeto colocou em `docs/` quatro planilhas exportadas do po
 - **Bug real encontrado ao ligar a lista:** tanto `app/page.tsx` quanto `src/ui/admin/Boletins.tsx` tinham uma chamada a `nomePartido({}, cargoId, n)` com um objeto vazio fixo no lugar da lista de verdade — invisível até agora porque a lista sempre foi vazia mesmo (`{}`). Corrigido nos dois lugares para usar a lista importada.
 - Confirmado visualmente com Playwright, painel público e painel do administrador: "LULA 13" (Presidente) e "AUGUSTO COUTINHO 1000" (Deputado federal) aparecendo corretos nos dois.
 
+## PWA instalável
+
+Item do pedido original (ver Stack) que tinha ficado pra trás nas etapas — o site não tinha nem favicon até agora.
+
+- `app/icon.tsx`/`app/apple-icon.tsx`: ícone gerado por código (`next/og`), reproduzindo a marca do "O" de "JUNTOS" na logo (estrela verde num círculo, sobre roxo) — as logos em `public/` são só a wordmark larga, sem recorte quadrado aproveitável. `generateImageMetadata` gera os tamanhos 32/192/512 (conferidos em `next build`: rotas `/icon/32`, `/icon/192`, `/icon/512`, `/apple-icon`).
+- `app/manifest.ts`: nome, cores da marca, `display: standalone`, ícones 192/512 (um deles `purpose: maskable`). Gera `/manifest.webmanifest`, linkado automaticamente pelo Next no `<head>`.
+- `app/layout.tsx`: ganhou `viewport.themeColor` (nesta versão do Next, `themeColor` saiu de `metadata` e virou export próprio — conferido em `node_modules/next/dist/docs` antes de escrever, por causa do aviso de breaking changes no fim deste arquivo) e `metadata.appleWebApp`.
+- `public/sw.js` + `src/ui/RegistrarPWA.tsx`: service worker **mínimo**, só repassa requisições pra rede (sem cache nenhum). Existe só porque o Chrome exige um service worker com listener de `fetch` pra considerar o site instalável — o cenário offline de verdade continua sendo a fila em IndexedDB (`src/client/fila-offline.ts`), não cache de página. Registrado uma vez no carregamento, erro de registro é silencioso (não trava o app).
+- Confirmado: `next build` gera todas as rotas novas sem erro; `next start` com Playwright mostra o service worker `ativo` e o `<link rel="manifest">` apontando certo; ícones conferidos visualmente (192px e o apple-icon de 180px).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
