@@ -241,6 +241,18 @@ Testado pela primeira vez num celular de verdade (ver CLAUDE.md > Etapa 4, "vale
   - **Layout responsivo refeito**, mobile first: cada linha de candidato/partido empilha (seletor em cima, votos+remover embaixo) até 560px — nunca aperta duas colunas numa tela estreita a ponto de sobrepor. Só vira uma fileira única (seletor largo, votos, remover) a partir de 560px, com `display: contents` no wrapper de votos+remover pra virar itens diretos do grid maior sem duplicar HTML. **Confirmado visualmente em 320px, 390px e 1200px**, sem sobreposição em nenhum.
   - `app/novo/page.tsx`: a tela de conferência (antes de enviar) também passou a mostrar nome do candidato/partido, não só o número — mesma lista, mesmo padrão já usado no painel público e no painel do administrador.
 
+## Favoritos: painel com uma lista curada de candidatos
+
+A pedido da responsável pelo projeto: uma área separada do painel geral, só com um grupo pequeno de candidatos escolhidos à mão (por cargo), pra acompanhar de perto sem precisar abrir cada cargo e procurar entre todo mundo.
+
+- `src/domain/acompanhados.ts`: lista curada (`ACOMPANHADOS`), por cargo, só com `numero` + `partido` + `destaque`. O **nome** não fica guardado aqui — vem de `nomeCandidato()`/`data/candidatos.json` na hora de exibir, pra nunca destoar do resto do app nem ficar desatualizado se um número for corrigido. O **partido** fica guardado aqui porque a lista oficial só tem partido por candidato nos cargos proporcionais (federal/estadual); em presidente/governador/senador não tem de onde puxar.
+  - Números conferidos um a um contra `data/candidatos.json` na hora de montar a lista (nomes informados em formato "popular" bateram com grafias um pouco diferentes na lista oficial — ex.: "Jobinho Almeida" é "JOBSON ALMEIDA" (10000) na planilha do TSE).
+  - `tests/domain/acompanhados.test.ts`: confere que todo número da lista existe de verdade em `data/candidatos.json` (pra nunca mostrar um número errado por digitação) e que não há número repetido no mesmo cargo.
+- `app/favoritos/page.tsx`: uma seção por cargo, só com os candidatos da lista (não todos). Dentro de cada grupo, quem é `destaque` vem **sempre primeiro**, não importa a quantidade de votos — só depois disso é que desempata por votos. Mesmo princípio de leitura do painel geral: só `totais/{turno}_{cargo}`, em tempo real, nunca boletins.
+- Visual: candidato `destaque` ganha um cartão maior (ocupa duas colunas no grid, menos no celular), borda e selo "Destaque" na cor de acento, números maiores — os outros ficam num cartão simples, só número/nome/partido/votos/%.
+- Item de navegação novo ("Favoritos", `IconeEstrela`) entre "Apuração" e "Novo boletim" — público, sem exigir login, igual ao painel geral.
+- **Confirmado com Playwright**, boletim de teste com números que colocam de propósito um candidato "destaque" atrás em votos (ex.: Raquel Lyra com 10 votos, João Campos com 15): o destaque aparece primeiro mesmo assim, em todos os cargos testados. Conferido em 390px (celular) e 1280px (desktop).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

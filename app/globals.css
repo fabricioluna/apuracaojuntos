@@ -636,6 +636,73 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Favoritos ---------- */
+.favoritos-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.favorito {
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  background: var(--panel);
+}
+.favorito-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.favorito-partido {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.favorito-numeros {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 4px;
+}
+/* Candidato marcado como destaque: cartão maior, borda e selo na cor de acento, texto maior. */
+.favorito.destaque {
+  grid-column: span 2;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  padding: 18px 20px;
+}
+@media (max-width: 520px) {
+  .favorito.destaque {
+    grid-column: 1 / -1;
+  }
+}
+.favorito.destaque .nome {
+  font-size: 1.125rem;
+}
+.favorito.destaque .valor {
+  font-size: 1.375rem;
+}
+.favorito-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 2px 10px 2px 8px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  width: fit-content;
+  margin-bottom: 2px;
+}
+.favorito-selo svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* ---------- Novo boletim ---------- */
 .passos {
   display: flex;

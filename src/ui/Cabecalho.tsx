@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { sair } from '../client/sessao';
 import { usarSessao } from '../client/usarSessao';
-import { IconeBarras, IconeEscudo, IconeScan } from './icones';
+import { IconeBarras, IconeEscudo, IconeEstrela, IconeScan } from './icones';
 
 const ITENS = [
   { href: '/', rotulo: 'Apuração', Icone: IconeBarras },
+  { href: '/favoritos', rotulo: 'Favoritos', Icone: IconeEstrela },
   { href: '/novo', rotulo: 'Novo boletim', Icone: IconeScan },
   { href: '/admin', rotulo: 'Administração', Icone: IconeEscudo, soAdmin: true },
 ];
