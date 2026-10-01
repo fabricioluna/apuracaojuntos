@@ -24,9 +24,10 @@ export interface ConfigCidade {
   cargosPorTurno: Record<1 | 2, CargoId[]>;
 }
 
-/** O que chega do fiscal para um cargo, seja por QR Code (saída do decodificador) ou digitado. */
+/** O que chega do fiscal para um cargo, seja por QR Code (saída do decodificador), digitado, ou
+ * restaurado de uma exportação CSV anterior (ver src/server/admin/importar-apuracao.ts). */
 export interface CargoEntrada extends CargoApurado {
-  origem: 'qrcode' | 'digitado';
+  origem: 'qrcode' | 'digitado' | 'importado';
 }
 
 /** Boletim pronto para gravar, já com zona/seção/turno conferidos e um cargo por origem. */
@@ -59,7 +60,7 @@ export interface BoletimGravado {
   zona: number;
   secao: number;
   turno: 1 | 2;
-  cargos: Partial<Record<CargoId, CargoApurado & { origem: 'qrcode' | 'digitado' }>>;
+  cargos: Partial<Record<CargoId, CargoApurado & { origem: 'qrcode' | 'digitado' | 'importado' }>>;
   assinatura?: 'verificada' | 'nao_verificada';
   fiscalId: string;
   fiscalNome: string;

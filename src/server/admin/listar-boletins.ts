@@ -16,10 +16,11 @@ export interface BoletimResumo {
   divergenciaPendente: boolean;
 }
 
+const NOME_ORIGEM: Record<string, string> = { qrcode: 'QR Code', digitado: 'Digitado', importado: 'Importado' };
+
 function origemDe(b: BoletimGravado): string {
-  const origens = new Set(Object.values(b.cargos).map(c => c!.origem));
-  if (origens.size === 1) return origens.has('qrcode') ? 'QR Code' : 'Digitado';
-  return 'QR Code e digitação';
+  const origens = [...new Set(Object.values(b.cargos).map(c => c!.origem))];
+  return origens.map(o => NOME_ORIGEM[o] ?? o).join(' e ');
 }
 
 /** Lista os boletins do turno, mais recentes primeiro. Só o servidor lê boletins/*. */

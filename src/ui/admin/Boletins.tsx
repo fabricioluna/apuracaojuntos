@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO } from '../../bu/cargos';
-import { listarBoletins, obterBoletim } from '../../client/admin';
+import { excluirBoletim, listarBoletins, obterBoletim } from '../../client/admin';
 import { usarConfigCidade } from '../../client/config';
 import { nomeCandidato, nomePartido, type ListaCandidatos } from '../../domain/candidatos';
 import type { BoletimGravado } from '../../domain/types';
@@ -32,6 +32,11 @@ export function BoletinsTab() {
 
   const filtrados = boletins.filter(b => !filtro || String(b.secao).includes(filtro) || String(b.zona).includes(filtro));
 
+  function aoExcluir(id: string) {
+    setBoletins(atual => atual && atual.filter(b => b.id !== id));
+    if (aberto === id) setAberto(null);
+  }
+
   return (
     <section className="painel">
       <div className="campo busca">
@@ -54,7 +59,7 @@ export function BoletinsTab() {
           <tbody>
             {filtrados.length ? (
               filtrados.map(b => (
-                <FragmentoBoletim key={b.id} b={b} aberto={aberto === b.id} onAlternar={() => setAberto(aberto === b.id ? null : b.id)} />
+                <FragmentoBoletim key={b.id} b={b} aberto={aberto === b.id} onAlternar={() => setAberto(aberto === b.id ? null : b.id)} onExcluido={() => aoExcluir(b.id)} />
               ))
             ) : (
               <tr>
@@ -68,7 +73,23 @@ export function BoletinsTab() {
   );
 }
 
-function FragmentoBoletim({ b, aberto, onAlternar }: { b: BoletimResumo; aberto: boolean; onAlternar: () => void }) {
+function FragmentoBoletim({ b, aberto, onAlternar, onExcluido }: { b: BoletimResumo; aberto: boolean; onAlternar: () => void; onExcluido: () => void }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function confirmar() {
+    setExcluindo(true);
+    setErro('');
+    try {
+      await excluirBoletim(b.id);
+      onExcluido();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível excluir.');
+      setExcluindo(false);
+    }
+  }
+
   return (
     <>
       <tr>
@@ -87,11 +108,36 @@ function FragmentoBoletim({ b, aberto, onAlternar }: { b: BoletimResumo; aberto:
           )}
         </td>
         <td>
-          <button className="btn ghost pequeno" onClick={onAlternar}>
-            {aberto ? 'Fechar' : 'Ver'}
-          </button>
+          <div className="linha-botoes" style={{ flexWrap: 'nowrap', justifyContent: 'flex-end' }}>
+            {!confirmando ? (
+              <>
+                <button className="btn ghost pequeno" onClick={onAlternar}>
+                  {aberto ? 'Fechar' : 'Ver'}
+                </button>
+                <button className="btn ghost pequeno" style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }} onClick={() => setConfirmando(true)}>
+                  Excluir
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn ghost pequeno" disabled={excluindo} onClick={confirmar} style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }}>
+                  {excluindo ? 'Excluindo…' : 'Confirmar exclusão'}
+                </button>
+                <button className="btn ghost pequeno" disabled={excluindo} onClick={() => setConfirmando(false)}>
+                  Cancelar
+                </button>
+              </>
+            )}
+          </div>
         </td>
       </tr>
+      {erro && (
+        <tr>
+          <td colSpan={7}>
+            <p className="msg erro">{erro}</p>
+          </td>
+        </tr>
+      )}
       {aberto && (
         <tr>
           <td colSpan={7}>

@@ -1,13 +1,28 @@
 'use client';
 import { useState } from 'react';
-import { atualizarConfig } from '../../client/admin';
+import { atualizarConfig, baixarExportacao, importarApuracao, zerarApuracao } from '../../client/admin';
 import { usarConfigCidade } from '../../client/config';
+
+type Msg = { tipo: 'ok' | 'erro'; texto: string } | null;
+
+const plural = (n: number, singular: string, pluralForma: string) => `${n} ${n === 1 ? singular : pluralForma}`;
 
 export function AjustesTab() {
   const { config } = usarConfigCidade();
   const [turno, setTurno] = useState<'1' | '2'>('1');
   const [salvando, setSalvando] = useState(false);
-  const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const [msg, setMsg] = useState<Msg>(null);
+
+  const [exportando, setExportando] = useState(false);
+  const [msgExport, setMsgExport] = useState<Msg>(null);
+
+  const [arquivoImportar, setArquivoImportar] = useState<File | null>(null);
+  const [importando, setImportando] = useState(false);
+  const [msgImportar, setMsgImportar] = useState<Msg>(null);
+
+  const [confirmacaoZerar, setConfirmacaoZerar] = useState('');
+  const [zerando, setZerando] = useState(false);
+  const [msgZerar, setMsgZerar] = useState<Msg>(null);
 
   if (!config) return null;
   const valorAtual = String(config.turno) as '1' | '2';
@@ -22,6 +37,53 @@ export function AjustesTab() {
       setMsg({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível salvar.' });
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function exportar() {
+    setExportando(true);
+    setMsgExport(null);
+    try {
+      await baixarExportacao(config!.turno);
+      setMsgExport({ tipo: 'ok', texto: 'Arquivo baixado.' });
+    } catch (e) {
+      setMsgExport({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível exportar.' });
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function importar() {
+    if (!arquivoImportar) return;
+    setImportando(true);
+    setMsgImportar(null);
+    try {
+      const texto = await arquivoImportar.text();
+      const r = await importarApuracao(texto);
+      const partes = [`${r.processados} urna(s) no arquivo`, `${r.novos} nova(s)`, `${r.iguais} já cadastrada(s) (idêntica)`, `${r.divergentes} com divergência (foram pro painel de Divergências)`];
+      setMsgImportar({ tipo: r.erros.length ? 'erro' : 'ok', texto: partes.join(', ') + (r.erros.length ? `. ${r.erros.length} com erro: ${r.erros[0]}` : '.') });
+      setArquivoImportar(null);
+    } catch (e) {
+      setMsgImportar({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível importar.' });
+    } finally {
+      setImportando(false);
+    }
+  }
+
+  async function zerar() {
+    setZerando(true);
+    setMsgZerar(null);
+    try {
+      const r = await zerarApuracao(config!.turno);
+      setMsgZerar({
+        tipo: 'ok',
+        texto: `Apagados ${plural(r.boletinsApagados, 'boletim', 'boletins')} e ${plural(r.divergenciasApagadas, 'divergência', 'divergências')} do ${config!.turno}º turno. Totais e mapa zerados.`,
+      });
+      setConfirmacaoZerar('');
+    } catch (e) {
+      setMsgZerar({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível zerar.' });
+    } finally {
+      setZerando(false);
     }
   }
 
@@ -62,6 +124,50 @@ export function AjustesTab() {
         Para adicionar, remover ou corrigir zonas e seções, use <code>node scripts/definir-config.mjs &lt;arquivo-da-cidade.json&gt;</code> no computador de quem
         administra o projeto — isso mantém o número de eleitores aptos e o nome do local de cada seção, que um formulário simples aqui poderia perder.
       </p>
+
+      <hr />
+
+      <h3>Exportar e importar</h3>
+      <p className="lead">
+        Exporta todos os boletins do {config.turno}º turno num CSV (abre no Excel, Google Sheets ou LibreOffice). Importar o mesmo formato de volta passa cada urna
+        pela mesma regra de sempre: se já existir com os mesmos números, não duplica nada; se os números forem diferentes, vira uma divergência pro administrador
+        decidir — nunca sobrescreve direto.
+      </p>
+      <div className="linha-botoes">
+        <button className="btn ghost" disabled={exportando} onClick={exportar}>
+          {exportando ? 'Exportando…' : `Exportar CSV (${config.turno}º turno)`}
+        </button>
+      </div>
+      {msgExport && <p className={`msg ${msgExport.tipo === 'ok' ? 'ok' : 'erro'}`}>{msgExport.texto}</p>}
+
+      <div className="campo" style={{ maxWidth: 420, marginTop: 12 }}>
+        <label htmlFor="aj-importar">Importar CSV</label>
+        <input id="aj-importar" type="file" accept=".csv,text/csv" onChange={e => setArquivoImportar(e.target.files?.[0] ?? null)} />
+      </div>
+      <div className="linha-botoes">
+        <button className="btn ghost" disabled={!arquivoImportar || importando} onClick={importar}>
+          {importando ? 'Importando…' : 'Importar'}
+        </button>
+      </div>
+      {msgImportar && <p className={`msg ${msgImportar.tipo === 'ok' ? 'ok' : 'erro'}`}>{msgImportar.texto}</p>}
+
+      <hr />
+
+      <h3 style={{ color: 'var(--bad)' }}>Zona de risco</h3>
+      <p className="lead">
+        Apaga <strong>todos</strong> os boletins, totais, mapa de urnas e divergências do {config.turno}º turno. Não dá pra desfazer. Se quiser guardar os dados
+        antes, exporte o CSV acima primeiro.
+      </p>
+      <div className="campo" style={{ maxWidth: 280 }}>
+        <label htmlFor="aj-confirma-zerar">Digite ZERAR para confirmar</label>
+        <input id="aj-confirma-zerar" value={confirmacaoZerar} onChange={e => setConfirmacaoZerar(e.target.value)} />
+      </div>
+      <div className="linha-botoes">
+        <button className="btn" style={{ background: 'var(--bad)', color: '#fff' }} disabled={confirmacaoZerar !== 'ZERAR' || zerando} onClick={zerar}>
+          {zerando ? 'Zerando…' : `Zerar apuração do ${config.turno}º turno`}
+        </button>
+      </div>
+      {msgZerar && <p className={`msg ${msgZerar.tipo === 'ok' ? 'ok' : 'erro'}`}>{msgZerar.texto}</p>}
     </section>
   );
 }
