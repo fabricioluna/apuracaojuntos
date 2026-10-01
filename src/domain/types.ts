@@ -38,8 +38,9 @@ export interface BoletimEntrada {
   cargos: Partial<Record<CargoId, CargoEntrada>>;
   /** Presente quando ao menos um cargo veio de QR Code. */
   origemBU?: Pick<BoletimDecodificado, 'origem' | 'fase' | 'uf' | 'municipio' | 'assinatura' | 'motivoAssinatura'>;
-  /** Caminho no Storage (boletins/{fiscalUid}/{arquivo}), só quando algum QR Code falhou. */
-  fotoPath?: string;
+  /** Caminhos no Storage (boletins/{fiscalUid}/{arquivo}), só quando algum QR Code falhou. Mais de
+   * um quando o boletim não coube numa foto só. */
+  fotoPaths?: string[];
 }
 
 export interface ErroDominio {
@@ -68,7 +69,7 @@ export interface BoletimGravado {
   corrigidoPor?: string;
   corrigidoEm?: number;
   fiscalAnteriorId?: string;
-  fotoPath?: string;
+  fotoPaths?: string[];
 }
 
 export interface DiferencaCampo {

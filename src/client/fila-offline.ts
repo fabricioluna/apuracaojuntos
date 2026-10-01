@@ -12,10 +12,10 @@ const LOJA = 'pendentes';
 export interface ItemFila {
   id: string;
   criadoEm: number;
-  /** Corpo a enviar para POST /api/boletins (sem fotoPath ainda, se a foto estiver em fotoBlob). */
+  /** Corpo a enviar para POST /api/boletins (sem fotoPaths ainda, se as fotos estiverem em fotoBlobs). */
   payload: Record<string, unknown>;
-  /** Foto ainda não enviada ao Storage (enviada só na hora de processar a fila, com conexão). */
-  fotoBlob?: Blob;
+  /** Fotos ainda não enviadas ao Storage (enviadas só na hora de processar a fila, com conexão). */
+  fotoBlobs?: Blob[];
   status: 'pendente' | 'enviado' | 'erro';
   mensagem?: string;
   fiscalUid: string;
@@ -42,8 +42,8 @@ async function comLoja<T>(modo: IDBTransactionMode, fn: (loja: IDBObjectStore) =
   });
 }
 
-export async function salvarPendente(payload: Record<string, unknown>, fiscalUid: string, fotoBlob?: Blob): Promise<string> {
-  const item: ItemFila = { id: crypto.randomUUID(), criadoEm: Date.now(), payload, fotoBlob, status: 'pendente', fiscalUid };
+export async function salvarPendente(payload: Record<string, unknown>, fiscalUid: string, fotoBlobs?: Blob[]): Promise<string> {
+  const item: ItemFila = { id: crypto.randomUUID(), criadoEm: Date.now(), payload, fotoBlobs, status: 'pendente', fiscalUid };
   await comLoja('readwrite', loja => loja.add(item));
   return item.id;
 }
@@ -84,10 +84,15 @@ export async function processarFila(): Promise<void> {
   for (const item of pendentes) {
     try {
       let payload = item.payload;
-      if (item.fotoBlob) {
-        const caminho = `boletins/${item.fiscalUid}/${item.id}.jpg`;
-        await uploadBytes(ref(clientStorage, caminho), item.fotoBlob, { contentType: 'image/jpeg' });
-        payload = { ...payload, fotoPath: caminho };
+      if (item.fotoBlobs?.length) {
+        const caminhos = await Promise.all(
+          item.fotoBlobs.map(async (blob, i) => {
+            const caminho = `boletins/${item.fiscalUid}/${item.id}-${i}.jpg`;
+            await uploadBytes(ref(clientStorage, caminho), blob, { contentType: 'image/jpeg' });
+            return caminho;
+          }),
+        );
+        payload = { ...payload, fotoPaths: caminhos };
       }
       await chamarApi('/api/boletins', { method: 'POST', body: JSON.stringify(payload) });
       await atualizar(item.id, { status: 'enviado', mensagem: undefined });

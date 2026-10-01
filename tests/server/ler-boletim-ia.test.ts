@@ -67,7 +67,7 @@ describe('lerBoletimComIA', () => {
     const original = process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_API_KEY;
     try {
-      await expect(lerBoletimComIA('AAAA', 'image/jpeg')).rejects.toThrow(/GEMINI_API_KEY/);
+      await expect(lerBoletimComIA([{ base64: 'AAAA', mimeType: 'image/jpeg' }])).rejects.toThrow(/GEMINI_API_KEY/);
     } finally {
       if (original !== undefined) process.env.GEMINI_API_KEY = original;
     }
@@ -76,19 +76,32 @@ describe('lerBoletimComIA', () => {
 
 describe('POST /api/ler-boletim', () => {
   it('exige login', async () => {
-    const r = await POST(req('http://local/api/ler-boletim', undefined, { method: 'POST', body: JSON.stringify({ imagemBase64: 'AA', mimeType: 'image/jpeg' }) }));
+    const r = await POST(req('http://local/api/ler-boletim', undefined, { method: 'POST', body: JSON.stringify({ imagens: [{ imagemBase64: 'AA', mimeType: 'image/jpeg' }] }) }));
     expect(r.status).toBe(401);
   });
 
-  it('recusa corpo sem imagem válida', async () => {
+  it('recusa corpo sem nenhuma imagem', async () => {
     const { idToken } = await loginComoFiscal('Fiscal Teste IA');
-    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ mimeType: 'image/jpeg' }) }));
+    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagens: [] }) }));
+    expect(r.status).toBe(400);
+  });
+
+  it('recusa imagem sem base64 ou mimeType', async () => {
+    const { idToken } = await loginComoFiscal('Fiscal Teste IA 1b');
+    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagens: [{ mimeType: 'image/jpeg' }] }) }));
     expect(r.status).toBe(400);
   });
 
   it('recusa tipo que não é imagem', async () => {
     const { idToken } = await loginComoFiscal('Fiscal Teste IA 2');
-    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagemBase64: 'AA', mimeType: 'application/pdf' }) }));
+    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagens: [{ imagemBase64: 'AA', mimeType: 'application/pdf' }] }) }));
+    expect(r.status).toBe(400);
+  });
+
+  it('recusa mais fotos do que o limite por boletim', async () => {
+    const { idToken } = await loginComoFiscal('Fiscal Teste IA 2b');
+    const imagens = Array.from({ length: 7 }, () => ({ imagemBase64: 'AA', mimeType: 'image/jpeg' }));
+    const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagens }) }));
     expect(r.status).toBe(400);
   });
 
@@ -97,7 +110,9 @@ describe('POST /api/ler-boletim', () => {
     delete process.env.GEMINI_API_KEY;
     try {
       const { idToken } = await loginComoFiscal('Fiscal Teste IA 3');
-      const r = await POST(req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagemBase64: 'AA', mimeType: 'image/jpeg' }) }));
+      const r = await POST(
+        req('http://local/api/ler-boletim', idToken, { method: 'POST', body: JSON.stringify({ imagens: [{ imagemBase64: 'AA', mimeType: 'image/jpeg' }] }) }),
+      );
       expect(r.status).toBe(422);
       const dados = await r.json();
       expect(dados.erro).toMatch(/GEMINI_API_KEY/);

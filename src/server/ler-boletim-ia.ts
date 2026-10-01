@@ -18,6 +18,8 @@ O boletim tem uma seção por cargo: Presidente, Governador, Senador, Deputado F
 - Só nos cargos proporcionais (Deputado Federal e Deputado Estadual): "Legenda" / votos de partido — número do partido (2 dígitos) e a quantidade.
 - "Brancos" e "Nulos": a quantidade de cada um.
 
+Você pode receber mais de uma foto. Isso acontece quando o papel do boletim é comprido demais pra caber inteiro numa única foto — nesse caso, cada foto mostra um trecho diferente (e as vezes um trecho que já apareceu, repetido, numa borda compartilhada entre duas fotos). Trate todas as fotos recebidas como pertencentes ao MESMO boletim, nunca como boletins diferentes: junte as informações de todas num resultado único. Se um mesmo cargo aparecer (inteiro ou em parte) em mais de uma foto, não conte os votos duas vezes — use a leitura mais nítida de cada item; se duas fotos mostrarem valores diferentes pro mesmo número e você não conseguir decidir qual está certo, omita esse item em vez de arriscar.
+
 Leia os valores exatamente como estão impressos. Se um número ou uma quantidade estiver ilegível, borrado ou você não tiver certeza, NÃO invente — omita esse item (é muito melhor faltar um dado do que inventar um valor errado, porque isto conta votos de verdade).
 
 Devolva SÓ um JSON (sem markdown, sem comentário, sem texto antes ou depois), neste formato exato:
@@ -47,7 +49,15 @@ export interface ResultadoLeituraIA {
   avisos: string[];
 }
 
-export async function lerBoletimComIA(imagemBase64: string, mimeType: string): Promise<ResultadoLeituraIA> {
+export interface ImagemParaLeitura {
+  base64: string;
+  mimeType: string;
+}
+
+/** Aceita uma ou mais fotos do mesmo boletim (ver PROMPT: usado quando o papel é longo demais pra
+ * caber numa foto só) — todas vão juntas numa única chamada, pra o próprio modelo juntar os dados
+ * sem contar nada em dobro, em vez de a gente tentar cruzar respostas separadas por conta própria. */
+export async function lerBoletimComIA(imagens: ImagemParaLeitura[]): Promise<ResultadoLeituraIA> {
   const chave = process.env.GEMINI_API_KEY;
   if (!chave) throw new ErroLeituraIA('A leitura por IA não está configurada neste servidor (falta a variável GEMINI_API_KEY). Digite os valores olhando o boletim.');
 
@@ -57,7 +67,7 @@ export async function lerBoletimComIA(imagemBase64: string, mimeType: string): P
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: imagemBase64 } }] }],
+        contents: [{ parts: [{ text: PROMPT }, ...imagens.map(img => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } }))] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json' },
       }),
     });

@@ -319,6 +319,18 @@ A responsável pelo projeto perguntou se dava pra usar IA (tipo Gemini) ou OCR t
 4. Redeploy na Vercel pra pegar a variável — **feito**.
 5. Sem crédito disponível (ou sem a chave configurada), o botão "Tentar ler os números com IA" continua aparecendo, mas sempre mostra um aviso claro em vez de travar — o resto do app funciona normal.
 
+## Mais de uma foto no mesmo boletim
+
+A responsável pelo projeto perguntou: e quando o boletim é comprido demais pra caber numa foto só? Dá pra vincular mais de uma foto ao mesmo boletim e tratar informação repetida entre elas?
+
+- **Opção escolhida (entre duas propostas):** todas as fotos do boletim vão juntas numa **única chamada** ao Gemini, não uma chamada por foto. O próprio prompt (`src/server/ler-boletim-ia.ts`) agora explica que pode receber mais de uma foto do mesmo boletim (papel comprido, cortado em trechos, às vezes com uma borda repetida entre duas fotos) e instrui a nunca contar o mesmo cargo em dobro — preferir a leitura mais nítida, e omitir o item em caso de dúvida entre duas leituras divergentes, em vez de arriscar.
+  - **Por que essa opção e não "uma chamada por foto + cruzamento feito por nós"**: mais simples, e reaproveita a garantia que já existia (a sugestão só pré-preenche a digitação, nunca grava sozinha) — mesmo se a fusão da IA sair imperfeita, o fiscal ainda confere tudo antes de enviar. A alternativa (chamar uma vez por foto e comparar cargo a cargo no código) seria mais rigorosa, mas é consideravelmente mais trabalho pra um cenário que ainda não foi confirmado acontecer de fato em Pesqueira — fica anotada como possível evolução futura, se a primeira abordagem se mostrar insuficiente na prática.
+- **`lerBoletimComIA` e a rota `/api/ler-boletim`** agora recebem uma **lista** de imagens (`{ imagens: [{ imagemBase64, mimeType }, ...] }`), não mais uma só — limite de 6 fotos por tentativa, só pra evitar um payload desproporcional.
+- **Tela de Novo boletim** (`app/novo/page.tsx`): o botão de foto virou "Adicionar outra foto" depois da primeira, o `<input type="file">` ganhou `multiple` (escolher várias de uma vez também funciona), cada foto anexada aparece na lista com um botão "Remover", e "Tentar ler os números com IA" manda todas juntas.
+- **Armazenamento e gravação**: o campo mudou de `fotoPath?: string` para **`fotoPaths?: string[]`** em `BoletimEntrada`/`BoletimGravado` (`src/domain/types.ts`) e em todos os pontos que o liam/gravavam (`gravar-boletim.ts`, rota `/api/boletins`, fila offline, `listar-boletins.ts`). Sem dado real em produção ainda usando o nome antigo, foi uma troca direta, sem hack de compatibilidade. Cada foto sobe pro Storage com seu próprio nome (`boletins/{uid}/{id}-{indice}.jpg` na fila offline, um `crypto.randomUUID()` por foto no envio direto).
+- **Não mudou:** a lista de Boletins do painel do administrador ainda não exibe nenhuma foto (nunca exibiu, nem com uma só — não fazia parte do pedido original); só o campo no banco já está pronto pra isso se um dia for pedido.
+- Suíte completa 194/194 (testes de `/api/ler-boletim` e `/api/boletins` ajustados pro novo formato de lista; `typecheck` limpo).
+
 ## Gerador de boletins de teste (com QR Code de verdade)
 
 A pedido da responsável pelo projeto: boletins **sintéticos**, mas com QR Code que o nosso próprio decodificador aceita de verdade, pra testar escaneamento, foto e leitura por IA sem precisar de uma urna real.

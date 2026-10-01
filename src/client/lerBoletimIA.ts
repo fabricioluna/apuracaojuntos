@@ -20,7 +20,9 @@ function blobParaBase64(blob: Blob): Promise<string> {
   });
 }
 
-export async function lerBoletimComIA(foto: Blob, mimeType: string): Promise<ResultadoLeituraIA> {
-  const imagemBase64 = await blobParaBase64(foto);
-  return chamarApi<ResultadoLeituraIA>('/api/ler-boletim', { method: 'POST', body: JSON.stringify({ imagemBase64, mimeType }) });
+/** Aceita uma ou mais fotos do mesmo boletim — usado quando o papel é longo demais pra caber numa
+ * foto só; todas vão juntas numa chamada só, pra a IA juntar os dados sem contar nada em dobro. */
+export async function lerBoletimComIA(fotos: Blob[]): Promise<ResultadoLeituraIA> {
+  const imagens = await Promise.all(fotos.map(async foto => ({ imagemBase64: await blobParaBase64(foto), mimeType: foto.type || 'image/jpeg' })));
+  return chamarApi<ResultadoLeituraIA>('/api/ler-boletim', { method: 'POST', body: JSON.stringify({ imagens }) });
 }

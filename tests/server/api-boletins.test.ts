@@ -81,18 +81,18 @@ describe('POST /api/boletins', () => {
     expect(r.status).toBe(422);
   });
 
-  it('grava a referência da foto quando pertence ao próprio fiscal', async () => {
+  it('grava a referência das fotos quando pertencem ao próprio fiscal', async () => {
     const { idToken, uid } = await loginComoFiscal('Fiscal Com Foto');
-    const fotoPath = `boletins/${uid}/1234-prova.jpg`;
-    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPath }, idToken));
+    const fotoPaths = [`boletins/${uid}/1234-prova.jpg`, `boletins/${uid}/1234-prova-2.jpg`];
+    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPaths }, idToken));
     expect(r.status).toBe(200);
     const boletim = await db().collection('boletins').doc('9-16-1').get();
-    expect(boletim.data()!.fotoPath).toBe(fotoPath);
+    expect(boletim.data()!.fotoPaths).toEqual(fotoPaths);
   });
 
   it('recusa foto que não pertence ao fiscal autenticado', async () => {
     const { idToken } = await loginComoFiscal('Fiscal Malicioso');
-    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPath: 'boletins/outra-pessoa/foto.jpg' }, idToken));
+    const r = await POST(req({ partes: fabricarBU(dados1Original, dados2Original), fotoPaths: ['boletins/outra-pessoa/foto.jpg'] }, idToken));
     expect(r.status).toBe(400);
   });
 });

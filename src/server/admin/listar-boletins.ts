@@ -11,7 +11,7 @@ export interface BoletimResumo {
   corrigidoPor?: string;
   corrigidoEm?: number;
   origem: string; // 'QR Code' | 'Digitado' | 'QR Code e digitação'
-  fotoPath?: string;
+  fotoPaths?: string[];
   assinatura?: string;
   divergenciaPendente: boolean;
 }
@@ -44,7 +44,7 @@ export async function listarBoletins(turno: number): Promise<BoletimResumo[]> {
         corrigidoPor: b.corrigidoPor,
         corrigidoEm: b.corrigidoEm,
         origem: origemDe(b),
-        fotoPath: b.fotoPath,
+        fotoPaths: b.fotoPaths,
         assinatura: b.assinatura,
         divergenciaPendente: chavesComDivergencia.has(b.id),
       };

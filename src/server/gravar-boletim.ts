@@ -9,7 +9,7 @@ function paraBoletimGravado(entrada: BoletimEntrada, extra: Pick<BoletimGravado,
   let base: BoletimGravado = { ...extra, zona: entrada.zona, secao: entrada.secao, turno: entrada.turno, cargos: entrada.cargos };
   // O Firestore recusa campos com valor undefined; por isso só incluímos cada campo opcional quando existe.
   if (entrada.origemBU) base = { ...base, assinatura: entrada.origemBU.assinatura };
-  if (entrada.fotoPath) base = { ...base, fotoPath: entrada.fotoPath };
+  if (entrada.fotoPaths?.length) base = { ...base, fotoPaths: entrada.fotoPaths };
   return base;
 }
 

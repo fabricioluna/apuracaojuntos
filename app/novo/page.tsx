@@ -37,7 +37,7 @@ export default function PaginaNovoBoletim() {
   const [partes, setPartes] = useState<string[]>([]);
   const [mensagem, setMensagem] = useState<{ tipo: 'erro' | 'ok' | 'aviso'; texto: string } | null>(null);
   const [escaneando, setEscaneando] = useState(false);
-  const [foto, setFoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [fotos, setFotos] = useState<{ blob: Blob; url: string }[]>([]);
   const [lendoIA, setLendoIA] = useState(false);
   const [sugestaoIA, setSugestaoIA] = useState<Partial<Record<CargoId, SugestaoCargo>> | null>(null);
   const [zonaDigitado, setZonaDigitado] = useState('');
@@ -96,33 +96,44 @@ export default function PaginaNovoBoletim() {
     setEscaneando(false);
   }
 
-  async function aoEscolherFoto(arquivo: File | undefined) {
-    if (!arquivo) return;
-    setFoto({ blob: arquivo, url: URL.createObjectURL(arquivo) });
-    const texto = await lerArquivo('leitor-oculto', arquivo);
-    if (texto) {
-      setPartes(atual => (atual.includes(texto) ? atual : [...atual, texto]));
-      setMensagem({ tipo: 'ok', texto: 'Consegui ler um QR Code dessa foto. A foto continua anexada como prova.' });
-    } else {
-      setMensagem({ tipo: 'aviso', texto: 'A foto ficou anexada, mas não achei um QR Code legível nela. Tente ler os que faltam ou digite os valores.' });
+  async function aoEscolherFotos(arquivos: FileList | null) {
+    if (!arquivos || arquivos.length === 0) return;
+    const lista = Array.from(arquivos);
+    setFotos(atual => [...atual, ...lista.map(a => ({ blob: a, url: URL.createObjectURL(a) }))]);
+    let achouQr = false;
+    for (const arquivo of lista) {
+      const texto = await lerArquivo('leitor-oculto', arquivo);
+      if (texto) {
+        achouQr = true;
+        setPartes(atual => (atual.includes(texto) ? atual : [...atual, texto]));
+      }
     }
+    setMensagem(
+      achouQr
+        ? { tipo: 'ok', texto: 'Consegui ler um QR Code numa das fotos. As fotos continuam anexadas como prova.' }
+        : { tipo: 'aviso', texto: 'As fotos ficaram anexadas, mas não achei um QR Code legível nelas. Tente ler os que faltam, adicionar mais fotos, ou digite os valores.' },
+    );
+  }
+
+  function removerFoto(indice: number) {
+    setFotos(atual => atual.filter((_, i) => i !== indice));
   }
 
   async function aoLerComIA() {
-    if (!foto) return;
+    if (fotos.length === 0) return;
     setLendoIA(true);
-    setMensagem({ tipo: 'aviso', texto: 'Lendo a foto com IA…' });
+    setMensagem({ tipo: 'aviso', texto: fotos.length > 1 ? 'Lendo as fotos com IA…' : 'Lendo a foto com IA…' });
     try {
-      const r = await lerBoletimComIA(foto.blob, foto.blob.type || 'image/jpeg');
+      const r = await lerBoletimComIA(fotos.map(f => f.blob));
       setSugestaoIA(r.cargos);
       setMensagem(
         r.avisos.length
           ? { tipo: 'aviso', texto: `${r.avisos[0]} Confira todos os valores contra o papel antes de enviar.` }
-          : { tipo: 'ok', texto: 'Consegui ler a foto. Confira cada valor contra o boletim impresso antes de continuar.' },
+          : { tipo: 'ok', texto: 'Consegui ler a(s) foto(s). Confira cada valor contra o boletim impresso antes de continuar.' },
       );
       setVista('digitar-urna');
     } catch (e) {
-      setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não consegui ler essa foto com IA. Tente de novo ou digite os valores.' });
+      setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não consegui ler essa(s) foto(s) com IA. Tente de novo ou digite os valores.' });
     } finally {
       setLendoIA(false);
     }
@@ -132,7 +143,7 @@ export default function PaginaNovoBoletim() {
     pararCamera();
     setEscaneando(false);
     setPartes([]);
-    setFoto(null);
+    setFotos([]);
     setSugestaoIA(null);
     setOrigem(null);
     setMensagem(null);
@@ -155,16 +166,21 @@ export default function PaginaNovoBoletim() {
         origem.tipo === 'qr' ? { partes } : { zona: origem.zona, secao: origem.secao, turno: origem.turno, digitado: paraDigitadoBruto(origem.cargos) };
       try {
         let corpo = payload;
-        if (foto) {
-          const caminho = `boletins/${sessao.uid}/${crypto.randomUUID()}.jpg`;
-          await uploadBytes(ref(clientStorage, caminho), foto.blob, { contentType: 'image/jpeg' });
-          corpo = { ...payload, fotoPath: caminho };
+        if (fotos.length > 0) {
+          const caminhos = await Promise.all(
+            fotos.map(async f => {
+              const caminho = `boletins/${sessao.uid}/${crypto.randomUUID()}.jpg`;
+              await uploadBytes(ref(clientStorage, caminho), f.blob, { contentType: 'image/jpeg' });
+              return caminho;
+            }),
+          );
+          corpo = { ...payload, fotoPaths: caminhos };
         }
         const r = await chamarApi<{ resultado: { status: string; fiscalNome?: string } }>('/api/boletins', { method: 'POST', body: JSON.stringify(corpo) });
         anunciarResultado(r.resultado);
       } catch (e) {
         if (e instanceof TypeError) {
-          await salvarPendente(payload, sessao.uid, foto?.blob);
+          await salvarPendente(payload, sessao.uid, fotos.map(f => f.blob));
           setResultadoFinal({ tipo: 'aviso', texto: 'Sem conexão agora. O boletim ficou guardado neste aparelho e será enviado sozinho quando a internet voltar.' });
         } else {
           throw e;
@@ -216,7 +232,11 @@ export default function PaginaNovoBoletim() {
         {vista === 'leitura' && (
           <section className="painel">
             <h1>Novo boletim</h1>
-            <p className="lead">Leia os QR Codes do boletim com a câmera. Se algum não ler, tire ou escolha uma foto — dá pra tentar ler os números com IA a partir dela; se nem assim der certo, digite os valores.</p>
+            <p className="lead">
+              Leia os QR Codes do boletim com a câmera. Se algum não ler, tire ou escolha uma foto — dá pra tentar ler os números com IA a partir dela. Se o boletim for
+              comprido e não couber numa foto só, tire mais de uma (ou escolha várias de uma vez): a IA junta as informações das fotos antes de sugerir os valores. Se
+              nem assim der certo, digite os valores.
+            </p>
             <div className="leitura">
               <div className="linha-botoes">
                 {!escaneando ? (
@@ -229,14 +249,16 @@ export default function PaginaNovoBoletim() {
                   </button>
                 )}
                 <button className="btn ghost" onClick={() => arquivoRef.current?.click()}>
-                  <IconeFoto /> Foto do boletim
+                  <IconeFoto /> {fotos.length > 0 ? 'Adicionar outra foto' : 'Foto do boletim'}
                 </button>
                 <button className="btn ghost" onClick={() => setVista('digitar-urna')}>
                   <IconeTeclado /> Digitar os valores
                 </button>
                 {/* Sem "capture": no celular, isso abre a escolha entre câmera, galeria e arquivos — com
-                    "capture=environment" o Android abre a câmera direto, sem dar a opção de galeria. */}
-                <input ref={arquivoRef} type="file" accept="image/*" hidden onChange={e => aoEscolherFoto(e.target.files?.[0])} />
+                    "capture=environment" o Android abre a câmera direto, sem dar a opção de galeria.
+                    "multiple" deixa escolher várias fotos de uma vez, pra boletim comprido demais pra
+                    caber numa foto só. */}
+                <input ref={arquivoRef} type="file" accept="image/*" multiple hidden onChange={e => { aoEscolherFotos(e.target.files); e.target.value = ''; }} />
               </div>
               <div className={`leitor-caixa ${escaneando ? '' : 'oculto'}`}>
                 <div id="leitor" />
@@ -247,14 +269,21 @@ export default function PaginaNovoBoletim() {
                   {mensagem.texto}
                 </p>
               )}
-              {foto && (
-                <div className="foto-prova">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={foto.url} alt="Foto do boletim anexada" />
-                  <span>Foto anexada como prova.</span>
+              {fotos.length > 0 && (
+                <div className="pilha">
+                  {fotos.map((f, i) => (
+                    <div className="foto-prova" key={f.url}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={f.url} alt={`Foto ${i + 1} do boletim anexada`} />
+                      <span>Foto {i + 1} anexada como prova.</span>
+                      <button className="btn ghost pequeno" onClick={() => removerFoto(i)}>
+                        Remover
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-              {foto && (
+              {fotos.length > 0 && (
                 <div className="linha-botoes">
                   <button className="btn ghost" disabled={lendoIA} onClick={aoLerComIA}>
                     {lendoIA ? 'Lendo…' : 'Tentar ler os números com IA'}
@@ -324,7 +353,7 @@ export default function PaginaNovoBoletim() {
           </section>
         )}
 
-        {vista === 'conferencia' && origem && <Conferencia origem={origem} foto={foto} enviando={enviando} onEnviar={aoEnviar} onVoltar={recomecar} />}
+        {vista === 'conferencia' && origem && <Conferencia origem={origem} fotos={fotos} enviando={enviando} onEnviar={aoEnviar} onVoltar={recomecar} />}
       </div>
     </main>
   );
@@ -338,13 +367,13 @@ function paraDigitadoBruto(cargos: Partial<Record<CargoId, CargoEntrada>>) {
 
 function Conferencia({
   origem,
-  foto,
+  fotos,
   enviando,
   onEnviar,
   onVoltar,
 }: {
   origem: OrigemBoletim;
-  foto: { blob: Blob; url: string } | null;
+  fotos: { blob: Blob; url: string }[];
   enviando: boolean;
   onEnviar: () => void;
   onVoltar: () => void;
@@ -409,11 +438,15 @@ function Conferencia({
           );
         })}
       </div>
-      {foto && (
-        <div className="foto-prova">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={foto.url} alt="Foto do boletim" />
-          <span>A foto será guardada como prova.</span>
+      {fotos.length > 0 && (
+        <div className="pilha">
+          {fotos.map((f, i) => (
+            <div className="foto-prova" key={f.url}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={f.url} alt={`Foto ${i + 1} do boletim`} />
+              <span>{fotos.length > 1 ? `Foto ${i + 1} será guardada como prova.` : 'A foto será guardada como prova.'}</span>
+            </div>
+          ))}
         </div>
       )}
       <div className="linha-botoes">
