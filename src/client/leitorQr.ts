@@ -10,7 +10,21 @@ export async function iniciarCamera(elementoId: string, aoLer: (texto: string) =
   const instancia = new Html5Qrcode(elementoId);
   camera = instancia;
   try {
-    await instancia.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 260 } }, aoLer, () => {});
+    await instancia.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 260, height: 260 },
+        // Limita a resolução pedida da câmera (só "ideal", nunca trava se o aparelho não tiver
+        // essa resolução exata). Sem isso, em navegadores sem leitor nativo de código (Safari do
+        // iPhone, por exemplo — só o Chrome Android tem essa API), cada quadro é decodificado em
+        // JavaScript puro na resolução cheia da câmera, o que fica perceptivelmente lento; o QR
+        // Code não precisa de resolução alta pra ser lido, só de nitidez.
+        videoConstraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      },
+      aoLer,
+      () => {},
+    );
   } catch (e) {
     camera = null;
     throw e;

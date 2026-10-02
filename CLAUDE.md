@@ -319,6 +319,16 @@ A responsável pelo projeto perguntou se dava pra usar IA (tipo Gemini) ou OCR t
 4. Redeploy na Vercel pra pegar a variável — **feito**.
 5. Sem crédito disponível (ou sem a chave configurada), o botão "Tentar ler os números com IA" continua aparecendo, mas sempre mostra um aviso claro em vez de travar — o resto do app funciona normal.
 
+## Câmera lenta no iPhone (Safari)
+
+A responsável pelo projeto testou a câmera ao vivo num iPhone de verdade: conseguiu ler um QR Code, mas demorou bastante.
+
+- **Causa identificada**: o `html5-qrcode` (2.3.8, já instalado) usa por padrão a API nativa do navegador (`BarcodeDetector`) quando disponível — bem mais rápida — e só cai no leitor em JavaScript puro quando não tem. Conferido no próprio pacote (`node_modules/html5-qrcode/src/html5-qrcode.ts`, `getUseBarCodeDetectorIfSupported`): isso já vem ligado por padrão, nada a configurar. O problema é que o **Safari do iPhone não implementa essa API** (só o Chrome Android tem) — nesse navegador a leitura sempre cai no modo lento, decodificando cada quadro da câmera em JavaScript.
+- **Ajuste feito** (`src/client/leitorQr.ts`, `iniciarCamera`): passei a limitar a resolução pedida da câmera (`videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } }`, mantendo `facingMode: 'environment'` dentro do mesmo objeto, porque passar `videoConstraints` substitui os outros parâmetros de câmera). Sem isso, o navegador costuma pedir a resolução mais alta que a câmera suporta, e o leitor em JavaScript decodifica cada quadro nessa resolução inteira — o QR Code não precisa de tantos pixels pra ser lido, só de nitidez, então isso deve reduzir bastante o trabalho por quadro no modo lento (sem efeito no Chrome Android, que já usa a API nativa).
+- **Risco assumido, por falta de iPhone neste ambiente pra testar de verdade**: a documentação do próprio pacote marca `videoConstraints` como "@beta, não totalmente suportado ainda". Usei `ideal` (nunca `min`/`exact`), que é a forma segura de pedir — o navegador ajusta pro mais próximo que conseguir, em vez de travar se não bater exato. **Confirmado que a câmera continua abrindo** com Playwright + câmera falsa do Chromium (`--use-fake-device-for-media-stream`), sem erro de console. **Não confirmado que isso resolve a lentidão no Safari real** — só um iPhone de verdade mostra isso. Pedir pra responsável pelo projeto testar de novo no mesmo aparelho antes do dia da eleição.
+- **Rede de segurança que já existe, independente desse ajuste**: mesmo que a câmera ao vivo continue lenta no iPhone, o fluxo de "Foto do boletim" (tirar uma foto de cada QR Code, em vez de escanear ao vivo) decodifica uma imagem só, de uma vez — não depende de ficar rápido quadro a quadro — e continua funcionando como alternativa, junto com a leitura por IA e a digitação manual.
+- Suíte completa 194/194 depois do ajuste; `typecheck` limpo.
+
 ## Mais de uma foto no mesmo boletim
 
 A responsável pelo projeto perguntou: e quando o boletim é comprido demais pra caber numa foto só? Dá pra vincular mais de uma foto ao mesmo boletim e tratar informação repetida entre elas?
