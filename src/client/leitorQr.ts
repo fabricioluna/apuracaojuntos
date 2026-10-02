@@ -21,6 +21,12 @@ export async function iniciarCamera(elementoId: string, aoLer: (texto: string) =
         // JavaScript puro na resolução cheia da câmera, o que fica perceptivelmente lento; o QR
         // Code não precisa de resolução alta pra ser lido, só de nitidez.
         videoConstraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        // Sem leitor nativo (ver acima), cada quadro sem QR Code visível — o caso comum enquanto
+        // reposiciona o celular entre um QR Code e outro — é decodificado DUAS vezes por padrão: a
+        // imagem normal e, se falhar, a imagem espelhada (pro caso de a câmera devolver o quadro
+        // invertido). Como só usamos a câmera traseira ('environment'), que nunca espelha, essa
+        // segunda tentativa é trabalho desperdiçado em todo quadro sem leitura — desligado aqui.
+        disableFlip: true,
       },
       aoLer,
       () => {},
