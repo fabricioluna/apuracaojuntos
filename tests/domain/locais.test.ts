@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { locaisFaltando, locaisPorSituacao } from '../../src/domain/locais';
+import { locaisApurados, locaisFaltando, locaisPorSituacao } from '../../src/domain/locais';
 import type { ConfigCidade } from '../../src/domain/types';
 
 const config: ConfigCidade = {
@@ -51,5 +51,17 @@ describe('locaisFaltando', () => {
   it('local com todas as seções apuradas some da lista', () => {
     const locais = locaisPorSituacao(config, new Set(['55-32', '55-33', '55-250', '55-999']));
     expect(locaisFaltando(locais)).toEqual([]);
+  });
+});
+
+describe('locaisApurados', () => {
+  it('só lista locais com todas as seções apuradas', () => {
+    const locais = locaisPorSituacao(config, new Set(['55-32', '55-33', '55-250']));
+    expect(locaisApurados(locais).map(l => l.nome).sort()).toEqual(['Colégio Avançar', 'Creche Mutuca']);
+  });
+
+  it('local com pelo menos uma seção faltando não entra', () => {
+    const locais = locaisPorSituacao(config, new Set(['55-32']));
+    expect(locaisApurados(locais).map(l => l.nome)).toEqual([]);
   });
 });

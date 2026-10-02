@@ -35,3 +35,7 @@ export function locaisPorSituacao(config: ConfigCidade, secoesComBoletim: Readon
 export function locaisFaltando(locais: LocalVotacao[]): LocalVotacao[] {
   return locais.filter(l => l.apuradas < l.total);
 }
+
+export function locaisApurados(locais: LocalVotacao[]): LocalVotacao[] {
+  return locais.filter(l => l.apuradas === l.total);
+}

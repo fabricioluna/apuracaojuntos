@@ -650,6 +650,44 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* Lista de locais de votação (painel público: "Locais que ainda faltam" / "Locais apurados"), com
+   as seções de cada local em chips — dá pra ver exatamente quais seções já têm boletim, não só uma
+   contagem genérica. */
+.lista-locais {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.local-linha {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+}
+.local-nome {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.local-secoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.secao-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.secao-chip.ok {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 650;
+}
+
 /* ---------- Favoritos ---------- */
 .favoritos-grade {
   display: grid;

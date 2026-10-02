@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO } from '../src/bu/cargos';
 import type { CargoId } from '../src/bu/types';
 import { nomeCandidato, nomePartido, type ListaCandidatos } from '../src/domain/candidatos';
-import { locaisFaltando, locaisPorSituacao } from '../src/domain/locais';
+import { locaisApurados, locaisFaltando, locaisPorSituacao, type LocalVotacao } from '../src/domain/locais';
 import { usarConfigCidade } from '../src/client/config';
 import { usarMapa, usarTotaisCargo, type TotaisCargo } from '../src/client/totais';
 import { IconeInfo } from '../src/ui/icones';
@@ -41,7 +41,9 @@ export default function PaginaApuracao() {
   const M = useMemo(() => config?.zonas.reduce((a, z) => a + z.secoes.length, 0) ?? 0, [config]);
   // Um boletim (mesmo com divergência em análise) já chegou dessa seção; só "ainda não enviada" falta.
   const secoesComBoletim = useMemo(() => new Set(mapa ? Object.keys(mapa.secoes) : []), [mapa]);
-  const faltam = useMemo(() => (config ? locaisFaltando(locaisPorSituacao(config, secoesComBoletim)) : []), [config, secoesComBoletim]);
+  const locais = useMemo(() => (config ? locaisPorSituacao(config, secoesComBoletim) : []), [config, secoesComBoletim]);
+  const faltam = useMemo(() => locaisFaltando(locais), [locais]);
+  const apurados = useMemo(() => locaisApurados(locais), [locais]);
 
   if (!config) return null;
 
@@ -137,14 +139,21 @@ export default function PaginaApuracao() {
               </li>
             </ul>
             {faltam.length > 0 && (
-              <details>
+              <details open>
                 <summary style={{ cursor: 'pointer', fontWeight: 650 }}>Locais que ainda faltam ({faltam.length})</summary>
-                <div className="fichas">
+                <div className="lista-locais">
                   {faltam.map(l => (
-                    <span className="ficha" key={l.nome}>
-                      {l.nome}
-                      {l.total > 1 ? ` (${l.apuradas}/${l.total})` : ''}
-                    </span>
+                    <LocalLinha key={l.nome} local={l} secoesComBoletim={secoesComBoletim} />
+                  ))}
+                </div>
+              </details>
+            )}
+            {apurados.length > 0 && (
+              <details>
+                <summary style={{ cursor: 'pointer', fontWeight: 650 }}>Locais apurados ({apurados.length})</summary>
+                <div className="lista-locais">
+                  {apurados.map(l => (
+                    <LocalLinha key={l.nome} local={l} secoesComBoletim={secoesComBoletim} />
                   ))}
                 </div>
               </details>
@@ -195,6 +204,31 @@ export default function PaginaApuracao() {
         </section>
       </div>
     </main>
+  );
+}
+
+/** Um local de votação na lista pública: nome + contagem, e as seções que o compõem, marcando quais
+ * já têm boletim. Um local com uma seção só não repete o número dela no título (já é o nome). */
+function LocalLinha({ local, secoesComBoletim }: { local: LocalVotacao; secoesComBoletim: Set<string> }) {
+  return (
+    <div className="local-linha">
+      <span className="local-nome">
+        {local.nome}
+        {local.total > 1 ? ` (${local.apuradas}/${local.total})` : local.apuradas === local.total ? ' ✓' : ''}
+      </span>
+      {local.total > 1 && (
+        <span className="local-secoes">
+          {local.secoes.map(s => {
+            const apurada = secoesComBoletim.has(`${s.zona}-${s.secao}`);
+            return (
+              <span key={s.secao} className={`secao-chip ${apurada ? 'ok' : ''}`} title={`Seção ${s.secao}: ${apurada ? 'apurada' : 'ainda não enviada'}`}>
+                {s.secao}
+              </span>
+            );
+          })}
+        </span>
+      )}
+    </div>
   );
 }
 
