@@ -788,11 +788,24 @@ main {
 .leitor-caixa.oculto {
   display: none;
 }
+/* A câmera é desenhada pelo html5-qrcode como um <video> com largura em pixel fixa (igual à largura
+   do elemento) e SEM altura definida — a altura acompanha a proporção nativa do vídeo. Num celular
+   em pé, a câmera traseira costuma devolver um vídeo bem mais alto que largo, o que fazia a caixa
+   ficar enorme e empurrar o resto da tela pra baixo (precisava rolar pra ver tudo). Fixando a altura
+   numa proporção quase quadrada (perto da caixa de mira) e cortando o excesso com object-fit:cover,
+   a câmera cabe na tela em qualquer celular, não importa a proporção que o aparelho devolver. */
 #leitor {
   width: 100%;
-  min-height: 60px;
+  aspect-ratio: 4 / 5;
+  max-height: min(60vh, 480px);
   border-radius: 10px;
   overflow: hidden;
+}
+#leitor video {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  object-fit: cover;
 }
 .lista-cargos {
   list-style: none;

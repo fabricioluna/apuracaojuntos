@@ -2,6 +2,7 @@
 // Envolve o html5-qrcode para a câmera (leitura contínua) e para decodificar uma foto (arquivo).
 // Usado tanto para escanear ao vivo quanto para tentar ler o QR Code de uma foto do boletim.
 import { Html5Qrcode } from 'html5-qrcode';
+import jsQR from 'jsqr';
 
 let camera: Html5Qrcode | null = null;
 
@@ -49,8 +50,38 @@ export async function pararCamera(): Promise<void> {
   }
 }
 
-/** Tenta ler um QR Code de uma imagem (foto do boletim). Devolve o texto ou null se não achar nenhum. */
+/** jsQR direto nos pixels (mesma biblioteca usada nos scripts Node — ver CLAUDE.md > "Gerador de
+ * boletins de teste"): achou QR Code em imagens onde o html5-qrcode não achou, mesmo numa foto
+ * legível e do tamanho nativo. Tentado primeiro, porque se provou mais confiável nos testes reais. */
+async function lerComJsQR(arquivo: File): Promise<string | null> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(arquivo);
+  } catch {
+    return null;
+  }
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0);
+    const imagem = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const resultado = jsQR(imagem.data, imagem.width, imagem.height);
+    return resultado?.data ?? null;
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Tenta ler um QR Code de uma imagem (foto do boletim). Devolve o texto ou null se não achar nenhum.
+ * Tenta jsQR primeiro; se não achar, tenta o html5-qrcode (scanFile) — algoritmos diferentes acham
+ * coisas diferentes, então vale tentar os dois antes de desistir. */
 export async function lerArquivo(elementoId: string, arquivo: File): Promise<string | null> {
+  const porJsQR = await lerComJsQR(arquivo);
+  if (porJsQR) return porJsQR;
+
   const leitor = new Html5Qrcode(elementoId);
   try {
     return await leitor.scanFile(arquivo, false);

@@ -46,6 +46,7 @@ export default function PaginaNovoBoletim() {
   const [enviando, setEnviando] = useState(false);
   const [resultadoFinal, setResultadoFinal] = useState<{ tipo: 'ok' | 'aviso'; texto: string } | null>(null);
   const arquivoRef = useRef<HTMLInputElement>(null);
+  const caixaCameraRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!carregando && !sessao) router.replace('/entrar');
@@ -86,6 +87,9 @@ export default function PaginaNovoBoletim() {
         setPartes(atual => (atual.includes(texto) ? atual : [...atual, texto]));
       });
       setMensagem({ tipo: 'aviso', texto: 'Câmera aberta. Aponte para um QR Code do boletim.' });
+      // Num celular, o texto de instrução + botões já ocupam boa parte da tela — sem isso, a câmera
+      // abria fora da área visível e era preciso rolar pra ver ela inteira.
+      caixaCameraRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch {
       setEscaneando(false);
       setMensagem({ tipo: 'erro', texto: 'Não consegui abrir a câmera. Libere a permissão ou use a foto do boletim.' });
@@ -232,11 +236,15 @@ export default function PaginaNovoBoletim() {
         {vista === 'leitura' && (
           <section className="painel">
             <h1>Novo boletim</h1>
-            <p className="lead">
-              Leia os QR Codes do boletim com a câmera. Se algum não ler, tire ou escolha uma foto — dá pra tentar ler os números com IA a partir dela. Se o boletim for
-              comprido e não couber numa foto só, tire mais de uma (ou escolha várias de uma vez): a IA junta as informações das fotos antes de sugerir os valores. Se
-              nem assim der certo, digite os valores.
-            </p>
+            {/* Escondido com a câmera aberta: num celular, o texto já empurrava a câmera pra fora da
+                tela visível, obrigando a rolar pra ver ela inteira. */}
+            {!escaneando && (
+              <p className="lead">
+                Leia os QR Codes do boletim com a câmera. Se algum não ler, tire ou escolha uma foto — dá pra tentar ler os números com IA a partir dela. Se o boletim for
+                comprido e não couber numa foto só, tire mais de uma (ou escolha várias de uma vez): a IA junta as informações das fotos antes de sugerir os valores. Se
+                nem assim der certo, digite os valores.
+              </p>
+            )}
             <div className="leitura">
               <div className="linha-botoes">
                 {!escaneando ? (
@@ -260,7 +268,7 @@ export default function PaginaNovoBoletim() {
                     caber numa foto só. */}
                 <input ref={arquivoRef} type="file" accept="image/*" multiple hidden onChange={e => { aoEscolherFotos(e.target.files); e.target.value = ''; }} />
               </div>
-              <div className={`leitor-caixa ${escaneando ? '' : 'oculto'}`}>
+              <div className={`leitor-caixa ${escaneando ? '' : 'oculto'}`} ref={caixaCameraRef}>
                 <div id="leitor" />
               </div>
               <div id="leitor-oculto" className="oculto-scan" aria-hidden />
