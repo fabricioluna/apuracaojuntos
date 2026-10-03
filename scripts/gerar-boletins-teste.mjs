@@ -23,6 +23,42 @@ const RAIZ = path.join(AQUI, '..');
 const candidatos = JSON.parse(fs.readFileSync(path.join(RAIZ, 'data/candidatos.json'), 'utf8'));
 const cidade = JSON.parse(fs.readFileSync(path.join(RAIZ, 'data/cidade/pesqueira.json'), 'utf8'));
 
+// Mesmos números de src/domain/acompanhados.ts — duplicado aqui de propósito (script Node avulso,
+// sem compilar TypeScript só por isso). Usado pra puxar esses candidatos pra liderança nos boletins
+// gerados, sem fixar um resultado (ainda sorteado, só com o peso pendendo pra eles).
+const ACOMPANHADOS = {
+  presidente: [{ numero: '13', destaque: false }, { numero: '22', destaque: false }],
+  governador: [{ numero: '50', destaque: false }, { numero: '40', destaque: false }, { numero: '55', destaque: true }],
+  senador: [
+    { numero: '111', destaque: false },
+    { numero: '130', destaque: true },
+    { numero: '123', destaque: false },
+    { numero: '222', destaque: false },
+    { numero: '555', destaque: true },
+  ],
+  federal: [
+    { numero: '2222', destaque: false },
+    { numero: '1314', destaque: false },
+    { numero: '4004', destaque: false },
+    { numero: '2256', destaque: false },
+    { numero: '1111', destaque: false },
+    { numero: '2000', destaque: false },
+    { numero: '1010', destaque: true },
+  ],
+  estadual: [
+    { numero: '22222', destaque: false },
+    { numero: '40400', destaque: false },
+    { numero: '11555', destaque: false },
+    { numero: '13123', destaque: false },
+    { numero: '40444', destaque: true },
+    { numero: '10000', destaque: false },
+    { numero: '20120', destaque: true },
+    { numero: '20123', destaque: false },
+    { numero: '40123', destaque: false },
+    { numero: '40555', destaque: false },
+  ],
+};
+
 const CARGOS = [
   { id: 'presidente', codigo: 1, tipo: 0, nome: 'Presidente' },
   { id: 'governador', codigo: 3, tipo: 0, nome: 'Governador' },
@@ -110,23 +146,51 @@ function blocoProporcional(cargo, votosPorCandidato, legendaPorPartido, aptos, b
   };
 }
 
+/** Candidatos de um cargo: todo acompanhado (destaque ou não) entra sempre, mais alguns extras
+ * sorteados — cada um com um peso de voto (bem maior pra quem é "destaque"), pra puxar esses nomes
+ * pra liderança sem fixar o resultado (ainda sorteado, só com a balança pendendo pra eles). */
+function candidatosComPeso(cargoId, qtdExtras) {
+  const lista = candidatos[cargoId] ?? {};
+  const numerosCandidatos = Object.keys(lista).filter(k => !k.startsWith('p'));
+  const acompanhados = ACOMPANHADOS[cargoId] ?? [];
+  const jaEscolhidos = new Set(acompanhados.map(c => c.numero));
+  const restantesPool = numerosCandidatos.filter(n => !jaEscolhidos.has(n));
+  const extras = sorteiaSemRepetir(restantesPool, qtdExtras).map(numero => ({ numero, destaque: false }));
+  return [...acompanhados, ...extras].map(c => ({ ...c, peso: c.destaque ? 4 + Math.random() * 3 : 0.4 + Math.random() }));
+}
+
+/** Distribui `totalVotos` entre `itens` (cada um com `.peso`) proporcional ao peso — o último item
+ * absorve o resto da divisão, então a soma bate exatamente com `totalVotos`. */
+function distribuirPorPeso(itens, totalVotos) {
+  const somaPesos = itens.reduce((a, it) => a + it.peso, 0) || 1;
+  const votos = {};
+  let restante = totalVotos;
+  itens.forEach((it, i) => {
+    const v = i === itens.length - 1 ? restante : Math.max(0, Math.round((it.peso / somaPesos) * totalVotos));
+    votos[it.numero] = Math.min(v, Math.max(0, restante));
+    restante -= votos[it.numero];
+  });
+  return votos;
+}
+
 function gerarCargo(cargo, aptos) {
   const lista = candidatos[cargo.id] ?? {};
-  const numerosCandidatos = Object.keys(lista).filter(k => !k.startsWith('p'));
   const branco = sorteioInt(0, 6);
   const nulo = sorteioInt(0, 6);
 
   if (cargo.tipo === 0) {
-    const n = cargo.id === 'senador' ? sorteioInt(2, 4) : sorteioInt(1, 3);
-    const escolhidos = sorteiaSemRepetir(numerosCandidatos, n);
-    const votos = {};
-    for (const numero of escolhidos) votos[numero] = sorteioInt(1, 25);
+    const nExtras = cargo.id === 'senador' ? sorteioInt(1, 2) : sorteioInt(0, 2);
+    const itens = candidatosComPeso(cargo.id, nExtras);
+    const totalNominal = itens.length * sorteioInt(8, 25);
+    const votos = distribuirPorPeso(itens, totalNominal);
     return blocoMajoritario(cargo, votos, aptos, branco, nulo);
   }
 
-  const escolhidos = sorteiaSemRepetir(numerosCandidatos, sorteioInt(3, 6));
-  const votos = {};
-  for (const numero of escolhidos) votos[numero] = sorteioInt(0, 20);
+  const nExtras = sorteioInt(1, 3);
+  const itens = candidatosComPeso(cargo.id, nExtras);
+  const totalNominal = itens.length * sorteioInt(6, 20);
+  const votos = distribuirPorPeso(itens, totalNominal);
+  const escolhidos = itens.map(it => it.numero);
   const partidosEnvolvidos = new Set(escolhidos.map(n => n.slice(0, 2)));
   // Sorteia legenda pra alguns partidos envolvidos, e também pra 0-2 partidos sem candidato sorteado.
   const numerosPartido = Object.keys(lista).filter(k => k.startsWith('p')).map(k => k.slice(1));
