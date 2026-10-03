@@ -349,6 +349,15 @@ A responsável pelo projeto pediu um boletim "real" (sem o aviso de simulado) pr
 - **Confirmado em produção**: enviados 10 boletins (candidatos e seções reais, pelo fiscal de teste já cadastrado) pela rota real `/api/boletins`. Conferido direto no Firestore: Raquel Lyra (governador), Humberto Costa e Túlio Gadêlha (senador), Silvio Costa Filho (federal), Luciano Duque e Eriberto Filho (estadual) — todos "destaque" — lideram seus cargos com folga. Fica visível ao vivo em apuracaojuntos.vercel.app, pronto pra apresentação.
 - Mesma rotina de limpeza de sempre depois da demonstração: "Zerar apuração" (Ajustes > Zona de risco) e excluir o fiscal de teste (não some com o "zerar").
 
+## Planilha "Plano B": cores de verdade e candidatos por número
+
+Pedido de melhoria, logo depois de entregar a primeira versão: deixar visualmente mais organizada, com cores e layout moderno, e ordenar os candidatos pelo número (como sai impresso no boletim) — a primeira versão tinha ficado na ordem que `ACOMPANHADOS` já vinha (que não é numérica).
+
+- **Troquei de biblioteca**: a `xlsx` (usada antes) é a versão gratuita/community do SheetJS, que **não grava estilo nenhum** no arquivo — testei (gravar uma cor de fundo numa célula e reabrir o `.xlsx` por dentro) e o `styles.xml` saiu vazio, sem nenhuma cor ou negrito, mesmo passando `cellStyles: true`. É uma limitação conhecida da versão pública no npm, não bug nosso: cor/fonte/borda são recurso pago (SheetJS Pro) nessa biblioteca. Pra conseguir cor de verdade, troquei pra `exceljs` (também gratuita, open-source, mas com suporte completo a estilo) — **só neste script**; o resumo em XLSX do painel do administrador continua com `xlsx`, sem pedido de estilo até agora.
+- **Visual**: cabeçalho roxo-profundo (`#4C0166`) com texto branco em negrito; candidatos marcados `destaque: true` em `acompanhados.ts` ganham fundo verde-acento (`#00FF05`); linha TOTAL com fundo lilás claro (`#F3EAFB`) e borda inferior mais grossa; linhas de seção com listrado bem sutil (branco/lilás quase imperceptível) pra guiar o olho nas 180 linhas; cabeçalho e as três primeiras colunas (Zona/Seção/Local) congelados (`views: [{state:'frozen', xSplit:3, ySplit:2}]`) — rola a planilha inteira sem perder de vista quem é a seção nem o total; filtro automático no cabeçalho. Cores vêm da mesma paleta da marca (CLAUDE.md > Visual).
+- **Ordenação por número**: candidatos de cada cargo ordenados por `Number(numero)` crescente antes de montar as colunas — confirmado nas 5 abas (ex.: Senador saiu 111, 123, 130, 222, 555; antes saía 111, 130, 123, 222, 555, fora de ordem).
+- Confirmado reabrindo o arquivo gerado com a própria `exceljs`: cor do cabeçalho (`FF4C0166`), cor de destaque (`FF00FF05`) nas colunas certas, congelamento, filtro e fórmulas — tudo bateu. Arquivo final ficou até menor que a versão anterior (47KB vs. 186KB).
+
 ## Planilha "Plano B" pra apuração manual
 
 A responsável pelo projeto pediu um Excel pra servir de plano B (se o app ficar fora do ar no dia da eleição): preenchida à mão, que calcule a votação sozinha, organizada por seção, só com os candidatos favoritos.
