@@ -40,11 +40,11 @@ export function AjustesTab() {
     }
   }
 
-  async function exportar() {
+  async function exportar(tipo: 'backup' | 'resumo', formato: 'csv' | 'xlsx' = 'csv') {
     setExportando(true);
     setMsgExport(null);
     try {
-      await baixarExportacao(config!.turno);
+      await baixarExportacao(config!.turno, tipo, formato);
       setMsgExport({ tipo: 'ok', texto: 'Arquivo baixado.' });
     } catch (e) {
       setMsgExport({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível exportar.' });
@@ -129,13 +129,20 @@ export function AjustesTab() {
 
       <h3>Exportar e importar</h3>
       <p className="lead">
-        Exporta todos os boletins do {config.turno}º turno num CSV (abre no Excel, Google Sheets ou LibreOffice). Importar o mesmo formato de volta passa cada urna
-        pela mesma regra de sempre: se já existir com os mesmos números, não duplica nada; se os números forem diferentes, vira uma divergência pro administrador
-        decidir — nunca sobrescreve direto.
+        O <strong>resumo da votação</strong> traz o nome de cada candidato e o total de votos já somado, pronto pra ler ou mostrar — em CSV ou em planilha (XLSX),
+        com uma aba por cargo. O <strong>backup completo</strong> é um CSV à parte, um boletim por linha (sem nome, só número) — serve pra guardar e, se precisar,
+        importar de volta: cada urna passa pela mesma regra de sempre (se já existir com os mesmos números, não duplica; se os números forem diferentes, vira uma
+        divergência pro administrador decidir — nunca sobrescreve direto).
       </p>
       <div className="linha-botoes">
-        <button className="btn ghost" disabled={exportando} onClick={exportar}>
-          {exportando ? 'Exportando…' : `Exportar CSV (${config.turno}º turno)`}
+        <button className="btn ghost" disabled={exportando} onClick={() => exportar('resumo', 'csv')}>
+          {exportando ? 'Exportando…' : `Resumo da votação (CSV)`}
+        </button>
+        <button className="btn ghost" disabled={exportando} onClick={() => exportar('resumo', 'xlsx')}>
+          {exportando ? 'Exportando…' : `Resumo da votação (XLSX)`}
+        </button>
+        <button className="btn ghost" disabled={exportando} onClick={() => exportar('backup')}>
+          {exportando ? 'Exportando…' : `Backup completo (CSV, ${config.turno}º turno)`}
         </button>
       </div>
       {msgExport && <p className={`msg ${msgExport.tipo === 'ok' ? 'ok' : 'erro'}`}>{msgExport.texto}</p>}

@@ -7,8 +7,9 @@ import { decodificarBU } from '../../src/bu';
 import { CARGOS_ORDEM } from '../../src/bu/cargos';
 import type { CargoId } from '../../src/bu/types';
 import type { BoletimEntrada, CargoEntrada } from '../../src/domain/types';
+import { utils as xlsxUtils, read as xlsxRead } from 'xlsx';
 import { excluirBoletim, ErroExcluirBoletim } from '../../src/server/admin/excluir-boletim';
-import { exportarApuracao } from '../../src/server/admin/exportar-apuracao';
+import { exportarApuracao, resumoParaCsv, resumoParaXlsx, resumoVotacao } from '../../src/server/admin/exportar-apuracao';
 import { importarApuracao } from '../../src/server/admin/importar-apuracao';
 import { zerarApuracao } from '../../src/server/admin/zerar-apuracao';
 import { db } from '../../src/server/firebase-admin';
@@ -149,5 +150,46 @@ describe('exportarApuracao / importarApuracao: ida e volta', () => {
     const { idToken } = await loginComoFiscal('Fiscal Comum');
     const r = await POST_importar(req('http://local/api/admin/importar', idToken, { method: 'POST', body: JSON.stringify({ csv: 'a,b' }) }));
     expect(r.status).toBe(403);
+  });
+});
+
+describe('resumoVotacao (resumo legível: nome + votos já somados)', () => {
+  it('traz os candidatos ordenados por votos (do maior pro menor), lendo de totais/*', async () => {
+    await gravarBoletim(entradaDeQR(fabricarBU(dados1Original, dados2Original)), fiscal1);
+    const linhas = await resumoVotacao(1);
+    const presidente = linhas.filter(l => l.cargo === 'Presidente' && l.tipo === 'candidato');
+    expect(presidente.length).toBeGreaterThan(0);
+    for (let i = 1; i < presidente.length; i++) expect(presidente[i - 1]!.votos).toBeGreaterThanOrEqual(presidente[i]!.votos);
+    expect(linhas.some(l => l.cargo === 'Presidente' && l.tipo === 'branco')).toBe(true);
+  });
+
+  it('CSV tem cabeçalho com nome das colunas e mostra o número de votos', async () => {
+    await gravarBoletim(entradaDeQR(fabricarBU(dados1Original, dados2Original)), fiscal1);
+    const csv = resumoParaCsv(await resumoVotacao(1));
+    expect(csv.split('\r\n')[0]).toBe('Cargo,Tipo,Número,Nome,Votos,% dos válidos');
+    expect(csv).toMatch(/,candidato,92,[^,]+,1,/); // candidato 92, 1 voto, no exemplo bu2026
+  });
+
+  it('XLSX gera uma aba por cargo, cada uma com os votos certos', async () => {
+    await gravarBoletim(entradaDeQR(fabricarBU(dados1Original, dados2Original)), fiscal1);
+    const buffer = resumoParaXlsx(await resumoVotacao(1));
+    const livro = xlsxRead(buffer, { type: 'buffer' });
+    expect(livro.SheetNames).toContain('Presidente');
+    const linhasPlanilha = xlsxUtils.sheet_to_json(livro.Sheets['Presidente']!, { header: 1 }) as unknown[][];
+    expect(linhasPlanilha[0]).toEqual(['Tipo', 'Número', 'Nome', 'Votos', '% dos válidos']);
+    expect(linhasPlanilha.length).toBeGreaterThan(1);
+  });
+
+  it('rota devolve o resumo em CSV ou XLSX, com o content-type certo', async () => {
+    await gravarBoletim(entradaDeQR(fabricarBU(dados1Original, dados2Original)), fiscal1);
+    const { idToken } = await loginComoFiscal('Administradora Resumo', { admin: true });
+
+    const rCsv = await GET_exportar(req('http://local/api/admin/exportar?turno=1&tipo=resumo&formato=csv', idToken));
+    expect(rCsv.status).toBe(200);
+    expect(rCsv.headers.get('content-type')).toContain('text/csv');
+
+    const rXlsx = await GET_exportar(req('http://local/api/admin/exportar?turno=1&tipo=resumo&formato=xlsx', idToken));
+    expect(rXlsx.status).toBe(200);
+    expect(rXlsx.headers.get('content-type')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   });
 });

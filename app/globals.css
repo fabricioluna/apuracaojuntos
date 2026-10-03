@@ -754,6 +754,14 @@ main {
   width: 14px;
   height: 14px;
 }
+/* Brancos/nulos (pct "Mostrar brancos e nulos"): mesmo cartão, sem número/partido, cor neutra —
+   não compete visualmente com os candidatos de verdade. */
+.favorito.neutra {
+  color: var(--muted);
+}
+.favorito.neutra .valor {
+  color: var(--muted);
+}
 
 /* ---------- Novo boletim ---------- */
 .passos {

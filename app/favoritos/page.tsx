@@ -4,6 +4,7 @@
 // com os marcados como "destaque" primeiro e com mais ênfase visual — pedido da responsável pelo
 // projeto, pra acompanhar de perto um grupo pequeno de candidatos sem precisar abrir cada cargo e
 // procurar entre todo mundo no painel geral.
+import { useState } from 'react';
 import { CARGOS_ORDEM, NOME_CARGO } from '../../src/bu/cargos';
 import type { CargoId } from '../../src/bu/types';
 import { nomeCandidato, type ListaCandidatos } from '../../src/domain/candidatos';
@@ -22,6 +23,8 @@ export default function PaginaFavoritos() {
   const { config } = usarConfigCidade();
   const turno = (config?.turno ?? 1) as 1 | 2;
   const grupos = CARGOS_ORDEM.filter(id => (ACOMPANHADOS[id]?.length ?? 0) > 0);
+  // Conveniência de sessão, não persiste entre recargas — mesmo critério do painel geral (app/page.tsx).
+  const [mostrarBN, setMostrarBN] = useState(true);
 
   return (
     <main>
@@ -36,15 +39,19 @@ export default function PaginaFavoritos() {
         <div className="cabeca-pagina">
           <h1>Favoritos</h1>
         </div>
+        <label className="chave">
+          <input type="checkbox" checked={mostrarBN} onChange={e => setMostrarBN(e.target.checked)} />
+          Mostrar brancos e nulos
+        </label>
         {grupos.map(id => (
-          <GrupoCargo key={id} cargoId={id} turno={turno} lista={ACOMPANHADOS[id]!} />
+          <GrupoCargo key={id} cargoId={id} turno={turno} lista={ACOMPANHADOS[id]!} mostrarBN={mostrarBN} />
         ))}
       </div>
     </main>
   );
 }
 
-function GrupoCargo({ cargoId, turno, lista }: { cargoId: CargoId; turno: 1 | 2; lista: CandidatoAcompanhado[] }) {
+function GrupoCargo({ cargoId, turno, lista, mostrarBN }: { cargoId: CargoId; turno: 1 | 2; lista: CandidatoAcompanhado[]; mostrarBN: boolean }) {
   const { totais } = usarTotaisCargo(turno, cargoId);
   const validos = totais ? totais.total - totais.branco - totais.nulo : 0;
 
@@ -80,6 +87,28 @@ function GrupoCargo({ cargoId, turno, lista }: { cargoId: CargoId; turno: 1 | 2;
             </div>
           );
         })}
+        {mostrarBN && totais && (
+          <>
+            <div className="favorito neutra">
+              <div className="favorito-topo">
+                <span className="nome">Brancos</span>
+              </div>
+              <div className="favorito-numeros">
+                <span className="valor">{fmt(totais.branco)}</span>
+                <span className="pct">{pct(totais.branco, totais.total)}</span>
+              </div>
+            </div>
+            <div className="favorito neutra">
+              <div className="favorito-topo">
+                <span className="nome">Nulos</span>
+              </div>
+              <div className="favorito-numeros">
+                <span className="valor">{fmt(totais.nulo)}</span>
+                <span className="pct">{pct(totais.nulo, totais.total)}</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
