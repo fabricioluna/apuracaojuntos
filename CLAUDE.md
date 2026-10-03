@@ -345,9 +345,10 @@ A responsável pelo projeto pediu pra cruzar `docs/locais.csv` (a planilha origi
 A pedido da responsável pelo projeto: a lista de locais do painel público mostrava só "Nome (apuradas/total)" — pediu pra melhorar e "colocar o número na lista". Perguntei qual número (o índice do local no PDF da zona, ou os números das seções de cada local) — escolhida a segunda opção, que já tínhamos o dado pronto (não precisou importar nada novo).
 
 - `src/domain/locais.ts` ganhou `locaisApurados` (espelha `locaisFaltando`, já existia).
-- `app/page.tsx`: a lista virou duas (`<details>` separados) — **"Locais que ainda faltam"** (aberta por padrão) e **"Locais apurados"** (fechada) —, cada uma com um cartão por local (`LocalLinha`) mostrando o nome, a contagem, e um chip por seção daquele local (número da seção), destacando em verde as que já têm boletim. Local com uma seção só não repete o número (o nome já basta); com `apuradas === total` ganha um "✓" no título.
+- `app/page.tsx`: a lista virou duas (`<details>` separados) — **"Locais que ainda faltam"** (aberta por padrão) e **"Locais apurados"** (fechada) —, cada uma com um cartão por local (`LocalLinha`) mostrando o nome, a contagem, e um chip por seção daquele local (número da seção), destacando em verde as que já têm boletim. Com `apuradas === total` o título ganha um "✓".
 - `app/globals.css`: `.lista-locais`/`.local-linha`/`.local-secoes`/`.secao-chip` novas (não mexi em `.fichas`/`.ficha`, que continuam em uso no painel do administrador).
 - 2 testes novos pra `locaisApurados`; suíte completa 196/196. Confirmado visualmente com Playwright contra `next dev` + emuladores: um local de seção única totalmente apurado aparece em "Locais apurados"; um local de 4 seções com 2 enviadas aparece em "faltam" com os números certos destacados.
+- **Bug real reportado com print, corrigido logo em seguida**: a primeira versão escondia o chip da seção quando o local tinha uma seção só ("o nome já basta") — na prática, pra quem está olhando a lista, parecia um dado faltando (print mostrando "Posto de Saúde Beira-Mar" e outros cinco locais sem nenhum número ao lado). Removida essa exceção: o chip aparece sempre, mesmo com uma seção só. Confirmado visualmente que as seis seções reportadas (250, 255, 245, 191, 254, 125) voltaram a aparecer.
 
 ## Foto do QR Code não lida e câmera cortada na tela (celular real)
 

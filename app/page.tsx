@@ -207,8 +207,8 @@ export default function PaginaApuracao() {
   );
 }
 
-/** Um local de votação na lista pública: nome + contagem, e as seções que o compõem, marcando quais
- * já têm boletim. Um local com uma seção só não repete o número dela no título (já é o nome). */
+/** Um local de votação na lista pública: nome + contagem, e as seções que o compõem (sempre, mesmo
+ * quando é uma seção só — esconder nesse caso parecia, à primeira vista, um dado faltando). */
 function LocalLinha({ local, secoesComBoletim }: { local: LocalVotacao; secoesComBoletim: Set<string> }) {
   return (
     <div className="local-linha">
@@ -216,18 +216,16 @@ function LocalLinha({ local, secoesComBoletim }: { local: LocalVotacao; secoesCo
         {local.nome}
         {local.total > 1 ? ` (${local.apuradas}/${local.total})` : local.apuradas === local.total ? ' ✓' : ''}
       </span>
-      {local.total > 1 && (
-        <span className="local-secoes">
-          {local.secoes.map(s => {
-            const apurada = secoesComBoletim.has(`${s.zona}-${s.secao}`);
-            return (
-              <span key={s.secao} className={`secao-chip ${apurada ? 'ok' : ''}`} title={`Seção ${s.secao}: ${apurada ? 'apurada' : 'ainda não enviada'}`}>
-                {s.secao}
-              </span>
-            );
-          })}
-        </span>
-      )}
+      <span className="local-secoes">
+        {local.secoes.map(s => {
+          const apurada = secoesComBoletim.has(`${s.zona}-${s.secao}`);
+          return (
+            <span key={s.secao} className={`secao-chip ${apurada ? 'ok' : ''}`} title={`Seção ${s.secao}: ${apurada ? 'apurada' : 'ainda não enviada'}`}>
+              {s.secao}
+            </span>
+          );
+        })}
+      </span>
     </div>
   );
 }
