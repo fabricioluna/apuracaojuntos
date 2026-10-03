@@ -5,11 +5,52 @@
 //
 // Uso: node scripts/enviar-boletins-teste-producao.mjs <codigo-do-fiscal> [quantidade=10]
 //
+// Os candidatos da lista curada (src/domain/acompanhados.ts, "destaque: true") sempre entram, com
+// votação puxada pra cima — pra uma demonstração (painel ao vivo) mostrar nomes reconhecíveis
+// liderando, em vez de só números aleatórios. O boletim impresso simulado continua com o aviso
+// "BOLETIM SIMULADO" bem visível (ver CLAUDE.md) — isso não muda; o que muda aqui é só a
+// distribuição de votos entre candidatos de verdade, pra um teste/demonstração mais realista.
+//
 // Depois de conferir no site: zerar a apuração pela aba Ajustes > "Zona de risco" do painel do
 // administrador (ou excluir boletim a boletim na aba Boletins), e excluir o fiscal de teste na
 // aba Fiscais (zerar não apaga fiscais).
 import fs from 'node:fs';
 import { carregarEnvLocal } from './lib/env.mjs';
+
+// Mesmos números de src/domain/acompanhados.ts — duplicado aqui de propósito: este é um script
+// Node avulso (.mjs), sem compilar TypeScript só pra reaproveitar essa lista pequena e estável.
+const ACOMPANHADOS = {
+  presidente: [{ numero: '13', destaque: false }, { numero: '22', destaque: false }],
+  governador: [{ numero: '50', destaque: false }, { numero: '40', destaque: false }, { numero: '55', destaque: true }],
+  senador: [
+    { numero: '111', destaque: false },
+    { numero: '130', destaque: true },
+    { numero: '123', destaque: false },
+    { numero: '222', destaque: false },
+    { numero: '555', destaque: true },
+  ],
+  federal: [
+    { numero: '2222', destaque: false },
+    { numero: '1314', destaque: false },
+    { numero: '4004', destaque: false },
+    { numero: '2256', destaque: false },
+    { numero: '1111', destaque: false },
+    { numero: '2000', destaque: false },
+    { numero: '1010', destaque: true },
+  ],
+  estadual: [
+    { numero: '22222', destaque: false },
+    { numero: '40400', destaque: false },
+    { numero: '11555', destaque: false },
+    { numero: '13123', destaque: false },
+    { numero: '40444', destaque: true },
+    { numero: '10000', destaque: false },
+    { numero: '20120', destaque: true },
+    { numero: '20123', destaque: false },
+    { numero: '40123', destaque: false },
+    { numero: '40555', destaque: false },
+  ],
+};
 
 carregarEnvLocal();
 
@@ -55,47 +96,66 @@ function partidosDoCargo(cargoId) {
   return mapa;
 }
 
-// Cargo majoritário (presidente/governador/senador): candidatos reais com votos, branco, nulo.
-function gerarMajoritario(cargoId, totalAlvo, qtdCandidatos) {
-  const nums = amostra(candidatosDoCargo(cargoId), qtdCandidatos);
+/** Monta a lista de candidatos de um cargo: todos os acompanhados (destaque ou não) primeiro, mais
+ * `qtdExtras` outros candidatos reais sorteados — e um peso de voto maior pra quem é "destaque", pra
+ * puxar esses nomes pra cima na apuração (útil numa demonstração: mostra gente reconhecível
+ * liderando, não só números aleatórios). */
+function candidatosComPeso(cargoId, qtdExtras) {
+  const acompanhados = ACOMPANHADOS[cargoId] ?? [];
+  const jaEscolhidos = new Set(acompanhados.map((c) => c.numero));
+  const restantesPool = candidatosDoCargo(cargoId).filter((n) => !jaEscolhidos.has(n));
+  const extras = amostra(restantesPool, qtdExtras).map((numero) => ({ numero, destaque: false }));
+  return [...acompanhados, ...extras].map((c) => ({ ...c, peso: c.destaque ? 4 + Math.random() * 3 : 0.4 + Math.random() }));
+}
+
+/** Distribui `totalAlvo` votos entre `itens` (cada um com `.peso`), proporcional ao peso — o
+ * último item absorve o resto da divisão, então a soma bate exatamente com `totalAlvo`. */
+function distribuirPorPeso(itens, totalAlvo) {
+  const somaPesos = itens.reduce((a, it) => a + it.peso, 0) || 1;
   const votos = {};
   let restante = totalAlvo;
-  for (let i = 0; i < nums.length; i++) {
-    const max = i === nums.length - 1 ? Math.floor(restante * 0.6) : Math.floor((restante / (nums.length - i)) * (0.6 + Math.random() * 0.8));
-    const v = Math.max(0, Math.min(max, restante));
-    votos[nums[i]] = v;
-    restante -= v;
-  }
+  itens.forEach((it, i) => {
+    const v = i === itens.length - 1 ? restante : Math.max(0, Math.round((it.peso / somaPesos) * totalAlvo));
+    votos[it.numero] = Math.min(v, Math.max(0, restante));
+    restante -= votos[it.numero];
+  });
+  return votos;
+}
+
+// Cargo majoritário (presidente/governador/senador): candidatos reais com votos, branco, nulo.
+function gerarMajoritario(cargoId, totalAlvo, qtdExtras) {
+  const itens = candidatosComPeso(cargoId, qtdExtras);
+  const votosValidos = Math.round(totalAlvo * (0.75 + Math.random() * 0.15));
+  const votos = distribuirPorPeso(itens, votosValidos);
+  const restante = totalAlvo - votosValidos; // a folga entre comparecimento e votos válidos vira brancos/nulos
   const branco = Math.floor(restante * Math.random() * 0.6);
-  restante -= branco;
-  const nulo = Math.max(0, restante);
+  const nulo = Math.max(0, restante - branco);
   return { votos, branco, nulo };
 }
 
-// Cargo proporcional (federal/estadual): candidatos + legenda de partido real.
-function gerarProporcional(cargoId, totalAlvo, qtdCandidatos) {
-  const nums = amostra(candidatosDoCargo(cargoId), qtdCandidatos);
+// Cargo proporcional (federal/estadual): candidatos (acompanhados primeiro) + legenda de partido real.
+function gerarProporcional(cargoId, totalAlvo, qtdExtras) {
+  const itens = candidatosComPeso(cargoId, qtdExtras);
   const partidosDisponiveis = Object.keys(partidosDoCargo(cargoId));
   const partidosEscolhidos = amostra(partidosDisponiveis, Math.min(3, partidosDisponiveis.length));
 
-  const votos = {};
-  let restante = totalAlvo;
-  for (let i = 0; i < nums.length; i++) {
-    const max = Math.floor((restante / (nums.length - i + partidosEscolhidos.length)) * (0.5 + Math.random()));
-    const v = Math.max(0, Math.min(max, restante));
-    votos[nums[i]] = v;
-    restante -= v;
-  }
+  const votosValidos = Math.round(totalAlvo * (0.7 + Math.random() * 0.15));
+  const votosCandidatos = Math.round(votosValidos * (0.75 + Math.random() * 0.15));
+  const votos = distribuirPorPeso(itens, votosCandidatos);
+
   const legenda = {};
-  for (const p of partidosEscolhidos) {
-    const max = Math.floor((restante / 3) * Math.random());
-    const v = Math.max(0, Math.min(max, restante));
-    legenda[p] = v;
-    restante -= v;
-  }
+  let restanteLegenda = votosValidos - votosCandidatos;
+  partidosEscolhidos.forEach((p, i) => {
+    const v = i === partidosEscolhidos.length - 1 ? restanteLegenda : Math.floor((restanteLegenda / partidosEscolhidos.length) * Math.random());
+    legenda[p] = Math.max(0, Math.min(v, restanteLegenda));
+    restanteLegenda -= legenda[p];
+  });
+
+  // Folga entre comparecimento e votos válidos, mais o que sobrou de legenda (se o último partido
+  // não consumiu tudo) — tudo isso vira brancos/nulos, pra soma bater com totalAlvo exatamente.
+  const restante = totalAlvo - votosValidos + restanteLegenda;
   const branco = Math.floor(restante * Math.random() * 0.6);
-  restante -= branco;
-  const nulo = Math.max(0, restante);
+  const nulo = Math.max(0, restante - branco);
   return { votos, legenda, branco, nulo };
 }
 
@@ -104,9 +164,9 @@ function gerarDigitado(aptos) {
   return {
     presidente: gerarMajoritario('presidente', comparecimento, 1 + aleatorio(2)),
     governador: gerarMajoritario('governador', comparecimento, 1 + aleatorio(2)),
-    senador: gerarMajoritario('senador', Math.floor(comparecimento * (1.4 + Math.random() * 0.5)), 2 + aleatorio(2)),
-    federal: gerarProporcional('federal', comparecimento, 2 + aleatorio(3)),
-    estadual: gerarProporcional('estadual', comparecimento, 2 + aleatorio(3)),
+    senador: gerarMajoritario('senador', Math.floor(comparecimento * (1.4 + Math.random() * 0.5)), 1 + aleatorio(2)),
+    federal: gerarProporcional('federal', comparecimento, 1 + aleatorio(2)),
+    estadual: gerarProporcional('estadual', comparecimento, 1 + aleatorio(2)),
   };
 }
 
