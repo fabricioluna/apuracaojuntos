@@ -349,6 +349,17 @@ A responsável pelo projeto pediu um boletim "real" (sem o aviso de simulado) pr
 - **Confirmado em produção**: enviados 10 boletins (candidatos e seções reais, pelo fiscal de teste já cadastrado) pela rota real `/api/boletins`. Conferido direto no Firestore: Raquel Lyra (governador), Humberto Costa e Túlio Gadêlha (senador), Silvio Costa Filho (federal), Luciano Duque e Eriberto Filho (estadual) — todos "destaque" — lideram seus cargos com folga. Fica visível ao vivo em apuracaojuntos.vercel.app, pronto pra apresentação.
 - Mesma rotina de limpeza de sempre depois da demonstração: "Zerar apuração" (Ajustes > Zona de risco) e excluir o fiscal de teste (não some com o "zerar").
 
+## Planilha "Plano B" pra apuração manual
+
+A responsável pelo projeto pediu um Excel pra servir de plano B (se o app ficar fora do ar no dia da eleição): preenchida à mão, que calcule a votação sozinha, organizada por seção, só com os candidatos favoritos.
+
+- `scripts/gerar-planilha-plano-b.mjs` → `docs/plano-b-apuracao.xlsx`. Uma aba "Leia primeiro" com instruções, e uma aba por cargo (só os que têm favoritos cadastrados em `src/domain/acompanhados.ts` — hoje os 5): uma linha por seção da zona 55 (180, ordenadas pelo número), uma coluna por candidato favorito (nome + número no cabeçalho), e uma coluna "Total da seção" no fim.
+- **Fica em branco de propósito** — é um molde pra preencher à mão, não vem com nenhum voto já lançado.
+- **"Calcula sozinho" de verdade, com fórmulas reais, não valores fixos**: a linha `TOTAL` (logo abaixo do cabeçalho, sempre visível sem rolar a planilha toda) tem `SUM(coluna3:coluna182)` pra cada candidato; cada linha de seção tem `SUM()` dos favoritos daquela linha na coluna "Total da seção". Testado de verdade: gerei o arquivo, descompactei o `.xlsx` (é um zip) e conferi o XML da planilha — `<c r="D2"><f>SUM(D3:D182)</f></c>` — a fórmula está mesmo lá, não é só o valor calculado uma vez. O Excel recalcula sozinho conforme alguém for preenchendo.
+  - **Pegadinha evitada**: `XLSX.readFile` + `sheet_to_json` (a própria biblioteca, só pra conferir) não mostra o resultado de uma fórmula sem valor em cache — pareceu "vazio" na primeira conferência, mas é só porque o SheetJS não tem motor de cálculo embutido (só grava/lê a fórmula). Confirmado olhando o XML bruto, que é o que importa pro Excel de verdade.
+- Reusa a mesma lista `ACOMPANHADOS` (duplicada, igual aos outros scripts avulsos — ver "Demonstração pro prefeito" e "Apresentação ao vivo") e `data/candidatos.json`/`data/cidade/pesqueira.json`.
+- `docs/plano-b-apuracao.xlsx` foi commitado (diferente de `docs/boletins-teste/`, que é fixture de teste descartável — este é um documento de verdade pra ter à mão antes da eleição). Se a lista de favoritos mudar, rodar `node scripts/gerar-planilha-plano-b.mjs` de novo e commitar o arquivo atualizado.
+
 ## Resumo legível da votação (CSV e XLSX) e brancos/nulos em Favoritos
 
 Três pedidos numa rodada: o toggle de "mostrar brancos e nulos" também em Favoritos, revisar a exportação em CSV ("parece que não está lendo a votação"), e exportar em XLSX se possível.
